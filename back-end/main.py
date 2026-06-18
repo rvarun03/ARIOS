@@ -7,7 +7,7 @@ from ingestion.pdf_ingestor import ingest_pdf
 from ingestion.ocr_ingestor import ingest_image
 from ingestion.github_ingestor import ingest_github
 from ingestion.ingestion_router import ingest
-
+from nlp.text_processor import TextProcessor
 
 app=FastAPI(title="ARIOS Backend")
 
@@ -54,10 +54,21 @@ def test_github():
 @app.get("/test/ingest")
 def test_ingest():
 
-    return ingest(
+    result= ingest(
         source_type="web",
         source="https://en.wikipedia.org/wiki/Virat_Kohli"
     )
+
+    processor=TextProcessor()
+    
+    cleaned_text = processor.clean_text(
+        result.raw_text
+    )
+
+    return {
+        "title": result.title,
+        "cleaned_text": cleaned_text[:3000]
+    }
 
 if __name__ == "__main__":
     uvicorn.run(
