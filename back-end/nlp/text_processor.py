@@ -1,4 +1,6 @@
 import re
+import unicodedata
+import spacy
 
 class TextProcessor:
 
@@ -10,7 +12,9 @@ class TextProcessor:
         - custom dictionaries
         - NLP pipeline settings
         """
-        pass
+        self.nlp=spacy.load(
+            "en_core_web_sm"
+        )
 
     # ==================================================
     # STEP 1: TEXT CLEANING
@@ -37,7 +41,35 @@ class TextProcessor:
         text = text.strip()
 
         return text
+    
+    # ==================================================
+    # STEP 2: Normalisation
+    # ==================================================
 
+    def normalize_text(self, text: str) -> str:
+
+        
+        text = self._unicode_normalize(text)
+
+        text = self._lowercase(text)
+
+
+        return text
+    
+    def tokenize(self, text: str)-> list[str]:
+        
+        if not text:
+            return []
+        
+        doc=self.nlp(text)
+
+        tokens=[
+            token.text 
+            for token in doc
+        ]
+
+        return tokens
+    
     # ==================================================
     # INTERNAL HELPERS
     # ==================================================
@@ -74,12 +106,18 @@ class TextProcessor:
             r"[ \t]+",
             " ",
             text
-        )    
-    def normalize_text(self, text: str) -> str:
-        pass
+        )
+        
+    def _unicode_normalize(self, text: str) -> str:
+        return unicodedata.normalize("NFKC", text)
 
-    def tokenize(self, text: str):
-        pass
+    def _lowercase(self, text: str) -> str:
+        return text.lower()
+    
+    ###################################################
+   
+
+    
 
     def remove_stopwords(self, tokens):
         pass

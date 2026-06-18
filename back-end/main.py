@@ -65,11 +65,19 @@ def test_ingest():
         result.raw_text
     )
 
+    normalised_text=processor.normalize_text(cleaned_text)
+
+    print("\n===== CLEANED TEXT =====\n")
+    print(cleaned_text[:1000])
+
+    print("\n===== NORMALIZED TEXT =====\n")
+    print(normalised_text[:1000])
+
     return {
         "title": result.title,
-        "cleaned_text": cleaned_text[:3000]
+        "cleaned_text": cleaned_text[:3000],
+        "normalized_text": normalised_text[:3000]
     }
-
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
