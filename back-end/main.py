@@ -8,6 +8,8 @@ from ingestion.ocr_ingestor import ingest_image
 from ingestion.github_ingestor import ingest_github
 from ingestion.ingestion_router import ingest
 from nlp.text_processor import TextProcessor
+from nlp.pos_tagger import POSTagger
+from nlp.NER import NER
 
 app=FastAPI(title="ARIOS Backend")
 
@@ -60,31 +62,36 @@ def test_ingest():
     )
 
     processor=TextProcessor()
-    
+    pos_tagger = POSTagger()
+    ner_extractor = NER()
+
     cleaned_text = processor.clean_text(
         result.raw_text
     )
 
     normalised_text=processor.normalize_text(cleaned_text)
 
-    tokenise = processor.tokenize(normalised_text)
+    doc = processor.tokenize(normalised_text)
 
-    print("tokenise", tokenise)
-    filtered_tokens=processor.remove_stopwords(tokenise)
 
-    print("\n===== CLEANED TEXT =====\n")
-    print(cleaned_text[:1000])
+    
+    filtered_tokens = processor.remove_stopwords(
+        doc
+    )
 
-    print("\n===== NORMALIZED TEXT =====\n")
-    print(normalised_text[:1000])
+    tagged_tokens = pos_tagger.tag(
+        doc
+    )
 
-    print(filtered_tokens)
-
+    entities = ner_extractor.extract(doc)
+    
+    print("entities", entities)
     return {
         "title": result.title,
         "cleaned_text": cleaned_text[:3000],
         "normalized_text": normalised_text[:3000]
     }
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
