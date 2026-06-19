@@ -1,6 +1,7 @@
 import re
 import unicodedata
 import spacy
+from spacy.tokens import Doc
 
 class TextProcessor:
 
@@ -12,9 +13,11 @@ class TextProcessor:
         - custom dictionaries
         - NLP pipeline settings
         """
+        
         self.nlp=spacy.load(
             "en_core_web_sm"
         )
+
 
     # ==================================================
     # STEP 1: TEXT CLEANING
@@ -56,20 +59,40 @@ class TextProcessor:
 
         return text
     
-    def tokenize(self, text: str)-> list[str]:
-        
-        if not text:
-            return []
-        
-        doc=self.nlp(text)
+    # ==================================================
+    # STEP 3: Tokenisation
+    # ==================================================
 
-        tokens=[
-            token.text 
+    def tokenize(self, text: str) -> Doc:
+
+        if not text:
+            return None
+
+        return self.nlp(text)
+    
+    # ==================================================
+    # STEP 4: Stop Words Removal
+    # ==================================================
+
+    def remove_stopwords(self, doc):
+
+        return [
+            token.text
+            for token in doc
+            if not token.is_stop
+        ]
+    
+    # ==================================================
+    # STEP 5: Lemmatization
+    # ==================================================
+
+    def lemmatize(self, doc):
+
+        return [
+            token.lemma_
             for token in doc
         ]
 
-        return tokens
-    
     # ==================================================
     # INTERNAL HELPERS
     # ==================================================
@@ -115,12 +138,5 @@ class TextProcessor:
         return text.lower()
     
     ###################################################
-   
 
     
-
-    def remove_stopwords(self, tokens):
-        pass
-
-    def lemmatize(self, tokens):
-        pass

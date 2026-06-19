@@ -67,11 +67,18 @@ def test_ingest():
 
     normalised_text=processor.normalize_text(cleaned_text)
 
+    tokenise = processor.tokenize(normalised_text)
+
+    print("tokenise", tokenise)
+    filtered_tokens=processor.remove_stopwords(tokenise)
+
     print("\n===== CLEANED TEXT =====\n")
     print(cleaned_text[:1000])
 
     print("\n===== NORMALIZED TEXT =====\n")
     print(normalised_text[:1000])
+
+    print(filtered_tokens)
 
     return {
         "title": result.title,
