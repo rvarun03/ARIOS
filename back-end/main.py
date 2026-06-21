@@ -12,6 +12,7 @@ from nlp.pos_tagger import POSTagger
 from nlp.NER import NER
 from nlp.dependency_parser import DependencyParser
 from nlp.keyword_extractor import KeywordExtractor
+from nlp.document_analyser import DocumentAnalyzer
 
 app=FastAPI(title="ARIOS Backend")
 
@@ -68,6 +69,7 @@ def test_ingest():
     ner_extractor = NER()
     parser = DependencyParser()
     keyword_extractor = KeywordExtractor()
+    document_analyser=DocumentAnalyzer()
 
     cleaned_text = processor.clean_text(
         result.raw_text
@@ -94,7 +96,11 @@ def test_ingest():
     keywords=keyword_extractor.extract(
         doc
     )
-    print("keywords", keywords[:100])
+        
+
+    analyse=document_analyser.analyse(doc=doc,entities=entities,keywords=keywords)
+
+    print(analyse)
     
     return {
         "title": result.title,
