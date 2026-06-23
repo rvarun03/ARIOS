@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
+
 from routes.health import router as health_router
 from ingestion.web_ingestor import ingest_web
 from ingestion.youtube_ingestor import ingest_youtube
@@ -13,11 +14,26 @@ from nlp.NER import NER
 from nlp.dependency_parser import DependencyParser
 from nlp.keyword_extractor import KeywordExtractor
 from nlp.document_analyser import DocumentAnalyzer
+from nlp.rankings.tfidf_extractor import TFIDFExtractor
+from routes.ingestion_routes import router as ingestion_router
+
+from core.database import (
+    Base,
+    engine
+)
+from models.document import Document
+
+
 
 app=FastAPI(title="ARIOS Backend")
 
+Base.metadata.create_all(
+    bind=engine
+)
+
 # register routes
 app.include_router(health_router)
+app.include_router(ingestion_router)
 
 @app.get("/")
 def root():
@@ -70,6 +86,7 @@ def test_ingest():
     parser = DependencyParser()
     keyword_extractor = KeywordExtractor()
     document_analyser=DocumentAnalyzer()
+    tf_idf_extractor=TFIDFExtractor()
 
     cleaned_text = processor.clean_text(
         result.raw_text
@@ -100,13 +117,19 @@ def test_ingest():
 
     analyse=document_analyser.analyse(doc=doc,entities=entities,keywords=keywords)
 
-    print(analyse)
-    
+    results = tf_idf_extractor.extract(
+        normalised_text
+    )
+    print(results)
     return {
         "title": result.title,
         "cleaned_text": cleaned_text[:3000],
         "normalized_text": normalised_text[:3000]
     }
+
+
+####################################
+
 
 if __name__ == "__main__":
     uvicorn.run(
