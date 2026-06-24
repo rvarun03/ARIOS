@@ -3,24 +3,56 @@ from sqlalchemy.orm import Session
 from models.document import Document
 from schemas.ingestion import IngestionOutput
 
-def create_document(
-    db: Session,
-    document: IngestionOutput
-):
+import hashlib
 
-    db_document = Document(
-        title=document.title,
-        source_type=document.source_type,
-        source_url=document.source_url,
-        raw_text=document.raw_text,
-        metadata_json=document.metadata
-    )
+class DocumentRepository:
 
-    db.add(db_document)
+    def generate_hash(
+        self,
+        text:str
+    ) -> str:
+        
+        return hashlib.sha256(
+            text.encode("utf-8")
+        ).hexdigest()
 
-    db.commit()
+    def get_by_hash(
+        self,
+        db: Session,
+        content_hash: str
+    ):
+        return(
+            db.query(Document)
+            .filter(
+                Document.content_hash == content_hash
+            )
+            .first()
+        )
 
-    db.refresh(db_document)
+    def create_document(
+        self,    
+        db: Session,
+        document: IngestionOutput
+    ):
 
-    return db_document
+        content_hash = self.generate_hash(
+            document.raw_text
+        )
+        
+        db_document = Document(
+            title=document.title,
+            source_type=document.source_type,
+            source_url=document.source_url,
+            raw_text=document.raw_text,
+            content_hash=content_hash,
+            metadata_json=document.metadata
+        )
+
+        db.add(db_document)
+
+        db.commit()
+
+        db.refresh(db_document)
+
+        return db_document
 

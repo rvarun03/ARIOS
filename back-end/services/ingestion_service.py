@@ -7,8 +7,10 @@ from ingestion.ocr_ingestor import ingest_image
 from ingestion.github_ingestor import ingest_github
 
 from repositories.document_repository import (
-    create_document
+    DocumentRepository
 )
+
+document_repo = DocumentRepository()
 
 
 def ingest_document_service(
@@ -39,7 +41,21 @@ def ingest_document_service(
             f"Unsupported source type: {source_type}"
         )
 
-    document = create_document(
+    content_hash = document_repo.generate_hash(
+        output.raw_text
+    )
+
+    existing_document = document_repo.get_by_hash(
+        db,
+        content_hash
+    )
+    
+    if existing_document:
+        raise ValueError(
+            f"Document already exists. ID={existing_document.id}"
+        )
+
+    document = document_repo.create_document(
         db=db,
         document=output
     )

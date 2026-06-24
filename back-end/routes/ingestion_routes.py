@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,HTTPException
 from sqlalchemy.orm import Session
 
 from schemas.ingestion import IngestionRequest
@@ -17,15 +17,26 @@ def ingest_document(
     db:Session = Depends(get_db)
     ):
     
-    document = ingest_document_service(
-        source_type=request.source_type,
-        source=request.source,
-        db=db
-    )
+    try:
 
-    return {
-        "id": document.id,
-        "title": document.title,
-        "source_type": document.source_type
-    }
+        document = ingest_document_service(
+            source_type=request.source_type,
+            source=request.source,
+            db=db
+        )
+
+        return {
+            "id": document.id,
+            "title": document.title,
+            "source_type": document.source_type
+        }
+    
+    except ValueError as e:
+
+        raise HTTPException(
+            status_code=409,
+            detail=str(e)
+        )
+
+
     
