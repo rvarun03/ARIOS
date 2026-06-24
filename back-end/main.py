@@ -1,12 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Depends
+from sqlalchemy.orm import Session
 import uvicorn
-
+from core.database import get_db
 from routes.health import router as health_router
-# from ingestion.web_ingestor import ingest_web
-# from ingestion.youtube_ingestor import ingest_youtube
-# from ingestion.pdf_ingestor import ingest_pdf
-# from ingestion.ocr_ingestor import ingest_image
-# from ingestion.github_ingestor import ingest_github
+
 from ingestion.ingestion_router import ingest
 from nlp.text_processor import TextProcessor
 from nlp.pos_tagger import POSTagger
@@ -16,6 +13,10 @@ from nlp.keyword_extractor import KeywordExtractor
 from nlp.document_analyser import DocumentAnalyzer
 from nlp.rankings.tfidf_extractor import TFIDFExtractor
 from routes.ingestion_routes import router as ingestion_router
+
+
+from services.corpus_service import get_corpus
+from nlp.rankings.corpus_tfidf_extractor import CorpusTFIDFExtractor
 
 from core.database import (
     Base,
@@ -38,38 +39,6 @@ app.include_router(ingestion_router)
 def root():
     return {"message": "ARIOS is running"}
 
-## DUMMY TEST FUNCTIONS
-
-# @app.get("/test-web")
-# def test_web():
-#     return ingest_web("https://en.wikipedia.org/wiki/Virat_Kohli")
-
-# @app.get("/test/youtube")
-# def test_youtube():
-#     return ingest_youtube(
-#         "https://www.youtube.com/watch?v=FzLpP8VBC6E&list=RDFzLpP8VBC6E&start_radio=1"
-#     )
-
-# @app.get("/test/pdf")
-# def test_pdf():
-
-#     return ingest_pdf(
-#         "Resume.pdf"
-#     )
-
-# @app.get("/test/ocr")
-# def test_ocr():
-
-#     return ingest_image(
-#         "sample.png"
-#     )
-
-# @app.get("/test/github")
-# def test_github():
-
-#     return ingest_github(
-#         "https://github.com/fastapi/fastapi.git"
-#     )
 
 @app.get("/test/ingest")
 def test_ingest():
@@ -126,6 +95,23 @@ def test_ingest():
         "normalized_text": normalised_text[:3000]
     }
 
+@app.get("/corpus/tfidf")
+def corpus_tfidf(db: Session = Depends(get_db)):
+
+    corpus = get_corpus(db)
+
+
+    extractor = CorpusTFIDFExtractor(
+        corpus=corpus
+    )
+
+    return {
+        "documents": extractor.tfidf_matrix.shape[0],
+        "features": extractor.tfidf_matrix.shape[1],
+        "top_terms": extractor.get_document_analyser(1)
+    }
+
+    
 
 ####################################
 

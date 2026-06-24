@@ -29,6 +29,16 @@ class DocumentRepository:
             .first()
         )
 
+    def get_all_documents(
+        self,
+        db:Session
+    ):
+        
+        return(
+            db.query(Document).
+            all()
+        )
+
     def create_document(
         self,    
         db: Session,

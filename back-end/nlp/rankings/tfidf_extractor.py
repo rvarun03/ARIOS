@@ -49,3 +49,5 @@ class TFIDFExtractor:
             for term, score in ranked_terms
             if not term.isdigit()
         ]
+
+
