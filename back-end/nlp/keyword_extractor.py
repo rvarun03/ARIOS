@@ -1,4 +1,5 @@
 from spacy.tokens import Doc
+from collections import Counter
 
 class KeywordExtractor:
     
@@ -10,7 +11,8 @@ class KeywordExtractor:
 
     def extract(
         self,
-        doc:Doc
+        doc:Doc,
+        top_n: int = 50
     ) -> list[str]:
         
         keywords=[]
@@ -26,7 +28,15 @@ class KeywordExtractor:
                     token.lemma_.lower()
                 )
 
-        return list(
-            set(keywords)
-        ) 
+        keyword_counts = Counter(
+            keywords
+        )
+
+        return [
+            {
+                "keyword": keyword,
+                "count": count
+            }
+            for keyword, count in keyword_counts.most_common(top_n)
+        ]
             

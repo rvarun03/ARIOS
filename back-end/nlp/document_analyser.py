@@ -7,7 +7,9 @@ class DocumentAnalyzer:
       self,
       doc: Doc,
       keywords: list,
-      entities: list      
+      entities: list,     
+      summary: list | None = None,
+      topics: dict | None = None 
     ):
         entity_types= Counter(
             entity["label"]
@@ -33,7 +35,9 @@ class DocumentAnalyzer:
 
                 "keyword_count": len(
                     keywords
-                )
+                ),
+
+                "summary_sentence_count": len(summary or [])
             },
 
             "metadata":{
@@ -41,6 +45,8 @@ class DocumentAnalyzer:
                 "entities": entities,
                 "entity_types": dict(
                     entity_types
-                )
+                ),
+                "summary":summary,
+                "topics": topics or {}
             }
         }

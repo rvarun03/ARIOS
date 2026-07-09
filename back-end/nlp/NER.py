@@ -1,7 +1,11 @@
 from spacy.tokens import Doc
 
 class NER:
-    def extract(self,doc:Doc):
+    def extract(
+            self,
+            doc:Doc,
+            max_entities: int | None = None
+        ):
 
         entities=[]
         
@@ -15,5 +19,7 @@ class NER:
                 }
             )
 
-
+        if max_entities is not None:
+            return entities[:max_entities]
+        
         return entities    

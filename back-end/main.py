@@ -13,10 +13,13 @@ from nlp.keyword_extractor import KeywordExtractor
 from nlp.document_analyser import DocumentAnalyzer
 from nlp.rankings.tfidf_extractor import TFIDFExtractor
 from routes.ingestion_routes import router as ingestion_router
-
-
-from services.corpus_service import get_corpus
+from nlp.topic_modeller import TopicModeller
 from nlp.rankings.corpus_tfidf_extractor import CorpusTFIDFExtractor
+from nlp.similarity.cosine_similarity import DocumentSimilarity
+from nlp.extractive_summarizer import ExtractiveSummarizer
+
+from services.nlp_analysis_service import NLPAnalysisService
+from services.corpus_service import get_corpus
 
 from core.database import (
     Base,
@@ -100,19 +103,123 @@ def corpus_tfidf(db: Session = Depends(get_db)):
 
     corpus = get_corpus(db)
 
-
+    
     extractor = CorpusTFIDFExtractor(
         corpus=corpus
     )
 
-    return {
-        "documents": extractor.tfidf_matrix.shape[0],
-        "features": extractor.tfidf_matrix.shape[1],
-        "top_terms": extractor.get_document_analyser(1)
-    }
+    similarity = DocumentSimilarity(
+        extractor.tfidf_matrix
+    )
+
+    return (
+    similarity.get_similar_documents(
+        document_index=0
+    )
+)
 
     
+@app.get("/test/topics")
+def test_topics():
 
+    sources = [
+        "https://en.wikipedia.org/wiki/Virat_Kohli",
+        "https://en.wikipedia.org/wiki/Sachin_Tendulkar",
+        "https://en.wikipedia.org/wiki/MS_Dhoni",
+        "https://en.wikipedia.org/wiki/FastAPI",
+        "https://en.wikipedia.org/wiki/Django_(web_framework)"
+    ]
+
+    processor = TextProcessor()
+
+    documents = []
+    titles = []
+
+    for source in sources:
+
+        result = ingest(
+            source_type="web",
+            source=source
+        )
+
+        cleaned_text = processor.clean_text(
+            result.raw_text
+        )
+
+        normalised_text = processor.normalize_text(
+            cleaned_text
+        )
+
+        documents.append(
+            normalised_text
+        )
+
+        titles.append(
+            result.title
+        )
+
+    topic_modeller = TopicModeller(
+        num_topics=2,
+        top_n_words=10,
+        max_features=1000
+    )
+
+    topic_result = topic_modeller.fit_transform(
+        documents=documents,
+        titles=titles
+    )
+
+    return topic_result    
+
+
+@app.get("/test/summary")
+def test_summary():
+
+    result = ingest(
+        source_type="web",
+        source="https://en.wikipedia.org/wiki/Virat_Kohli"
+    )
+
+    processor = TextProcessor()
+
+    cleaned_text = processor.clean_text(
+        result.raw_text
+    )
+
+    summary_doc = processor.tokenize(
+        cleaned_text
+    )
+
+    summarizer = ExtractiveSummarizer()
+
+    summary = summarizer.summarize(
+        doc=summary_doc,
+        max_sentences=5
+    )
+
+    print("summary", summary)
+
+    return {
+        "title": result.title,
+        "summary": summary
+    }
+
+@app.get("/test/nlp-pipeline")
+def test_nlp_pipeline():
+
+    ingestion_result = ingest(
+        source_type="web",
+        source="https://en.wikipedia.org/wiki/Virat_Kohli"
+    )
+
+    nlp_service = NLPAnalysisService()
+
+    result = nlp_service.analyse_document(
+        ingestion_result=ingestion_result,
+        max_summary_sentences=5
+    )
+
+    return result
 ####################################
 
 
