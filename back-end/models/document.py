@@ -1,3 +1,5 @@
+# models/document.py
+
 from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
@@ -29,12 +31,32 @@ class Document(Base):
         nullable=True
     )
 
+    file_name = Column(
+        String,
+        nullable=True
+    )
+
+    file_path = Column(
+        String,
+        nullable=True
+    )
+
+    file_type = Column(
+        String,
+        nullable=True
+    )
+
+    file_size = Column(
+        Integer,
+        nullable=True
+    )
+
     raw_text = Column(
         Text,
         nullable=False
     )
 
-    clesaned_text_preview = Column(
+    cleaned_text_preview = Column(
         Text,
         nullable=True
     )

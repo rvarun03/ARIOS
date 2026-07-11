@@ -1,68 +1,63 @@
-from sqlalchemy.orm import Session
+# repositories/document_repository.py
 
 from models.document import Document
-from schemas.ingestion import IngestionOutput
 
-import hashlib
 
 class DocumentRepository:
 
-    def generate_hash(
+    def create_document(
         self,
-        text:str
-    ) -> str:
-        
-        return hashlib.sha256(
-            text.encode("utf-8")
-        ).hexdigest()
+        db,
+        title: str,
+        source_type: str,
+        source_url: str | None,
+        raw_text: str,
+        cleaned_text_preview: str,
+        nlp_metadata: dict,
+        file_name: str | None = None,
+        file_path: str | None = None,
+        file_type: str | None = None,
+        file_size: int | None = None
+    ) -> Document:
 
-    def get_by_hash(
-        self,
-        db: Session,
-        content_hash: str
-    ):
-        return(
-            db.query(Document)
-            .filter(
-                Document.content_hash == content_hash
-            )
-            .first()
+        document = Document(
+            title=title,
+            source_type=source_type,
+            source_url=source_url,
+            file_name=file_name,
+            file_path=file_path,
+            file_type=file_type,
+            file_size=file_size,
+            raw_text=raw_text,
+            cleaned_text_preview=cleaned_text_preview,
+            nlp_metadata=nlp_metadata
         )
+
+        db.add(document)
+        db.commit()
+        db.refresh(document)
+
+        return document
 
     def get_all_documents(
         self,
-        db:Session
-    ):
-        
-        return(
-            db.query(Document).
-            all()
+        db
+    ) -> list[Document]:
+
+        return (
+            db.query(Document)
+            .order_by(Document.created_at.desc())
+            .all()
         )
 
-    def create_document(
-        self,    
-        db: Session,
-        document: IngestionOutput
-    ):
+    def get_document_by_id(
+        self,
+        db,
+        document_id: int
+    ) -> Document | None:
 
-        content_hash = self.generate_hash(
-            document.raw_text
+        return (
+            db.query(Document)
+            .filter(Document.document_id == document_id)
+            .first()
         )
-        
-        db_document = Document(
-            title=document.title,
-            source_type=document.source_type,
-            source_url=document.source_url,
-            raw_text=document.raw_text,
-            content_hash=content_hash,
-            metadata_json=document.metadata
-        )
-
-        db.add(db_document)
-
-        db.commit()
-
-        db.refresh(db_document)
-
-        return db_document
-
