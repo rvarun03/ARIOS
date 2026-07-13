@@ -59,6 +59,22 @@ def get_documents(
         db=db
     )
 
+@router.get("/search")
+def search_documents(
+    title: str | None = None,
+    source_type: str | None = None,
+    keyword: str | None = None,
+    entity: str | None = None,
+    db: Session = Depends(get_db)
+):
+
+    return document_service.search_documents(
+        db=db,
+        title=title,
+        source_type=source_type,
+        keyword=keyword,
+        entity=entity
+    )
 
 @router.get("/{document_id}")
 def get_document(

@@ -101,18 +101,12 @@ class DocumentService:
         )
 
         return [
-            {
-                "document_id": document.document_id,
-                "title": document.title,
-                "source_type": document.source_type,
-                "source_url": document.source_url,
-                "file_name": document.file_name,
-                "file_path": document.file_path,
-                "created_at": document.created_at
-            }
+            self._format_document_list_item(
+                document=document
+            )
             for document in documents
         ]
-
+    
     def get_document_by_id(
         self,
         db,
@@ -151,4 +145,132 @@ class DocumentService:
             "cleaned_text_preview": saved_document.cleaned_text_preview,
             "analysis": saved_document.nlp_metadata,
             "created_at": saved_document.created_at
+        }
+    
+    def search_documents(
+        self,
+        db,
+        title: str | None = None,
+        source_type: str | None = None,
+        keyword: str | None = None,
+        entity: str | None = None
+    ) -> list[dict]:
+        
+        documents = self.document_repository.search_documents(
+            db=db,
+            title=title,
+            source_type=source_type
+        )
+
+        filtered_documents=[]
+
+        for document in documents:
+             
+            if keyword and not self._document_has_keyword(
+                document=document,
+                keyword=keyword
+            ):
+                continue
+
+            if entity and not self._document_has_entity(
+                document=document,
+                entity=entity
+            ):
+                continue
+
+            filtered_documents.append(
+                self._format_document_list_item(
+                    document=document
+                )
+            )
+
+            return filtered_documents
+
+    def _document_has_keyword(
+        self,
+        document,
+        keyword: str
+    ) -> bool:
+        
+        metadata= document.nlp_metadata or {}
+
+        keywords=(
+            metadata
+            .get("metadata", {})
+            .get("keywords", {})
+        )
+
+        keyword = keyword.lower()
+
+        for item in keywords:
+
+            if isinstance(item,dict):
+                
+                stored_keyword=item.get(
+                    "keyword",""
+                )
+
+            else:
+                
+                stored_keyword = str(item).lower(
+                )
+
+            if keyword.lower() in stored_keyword:
+                return True
+
+        return False      
+
+    def _document_has_entity(
+        self,
+        document,
+        entity: str
+    ) -> bool:
+
+        metadata = document.nlp_metadata or {}
+
+        entities = (
+            metadata
+            .get("metadata", {})
+            .get("entities", [])
+        )
+
+        entity_lower = entity.lower()
+
+        for item in entities:
+
+            if isinstance(item, dict):
+                stored_entity = (
+                    item.get("text", "")
+                    .lower()
+                )
+
+            else:
+                stored_entity = str(item).lower()
+
+            if entity_lower in stored_entity:
+                return True
+
+        return False  
+    
+    def _format_document_list_item(
+        self,
+        document
+    ) -> dict:
+
+        metadata = document.nlp_metadata or {}
+
+        statistics = metadata.get(
+            "statistics",
+            {}
+        )
+
+        return {
+            "document_id": document.document_id,
+            "title": document.title,
+            "source_type": document.source_type,
+            "source_url": document.source_url,
+            "file_name": document.file_name,
+            "file_path": document.file_path,
+            "statistics": statistics,
+            "created_at": document.created_at
         }

@@ -61,3 +61,28 @@ class DocumentRepository:
             .filter(Document.document_id == document_id)
             .first()
         )
+    
+    def search_documents(
+        self,
+        db,
+        title: str | None = None,
+        source_type: str | None = None
+    ) -> list[Document]:
+        
+        query= db.query(Document)
+
+        if title:
+            query=query.filter(
+                Document.title.ilike(f"%{title}%")
+            )
+
+        if source_type:
+            query=query.filter(
+                Document.source_type == source_type
+            )    
+
+        return (
+            query
+            .order_by(Document.created_at.desc())
+            .all()
+        )    
