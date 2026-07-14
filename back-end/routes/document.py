@@ -76,6 +76,49 @@ def search_documents(
         entity=entity
     )
 
+@router.post("/{document_id}/chunks")
+def create_document_chunks(
+    document_id: int,
+    chunk_size: int = 500,
+    overlap: int = 50,
+    db: Session = Depends(get_db)
+):
+
+    result = document_service.create_chunks_for_document(
+        db=db,
+        document_id=document_id,
+        chunk_size=chunk_size,
+        overlap=overlap
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    return result
+
+
+@router.get("/{document_id}/chunks")
+def get_document_chunks(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+
+    result = document_service.get_chunks_for_document(
+        db=db,
+        document_id=document_id
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    return result
+
 @router.get("/{document_id}")
 def get_document(
     document_id: int,

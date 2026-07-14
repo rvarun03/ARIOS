@@ -4,7 +4,8 @@ from ingestion.ingestion_router import ingest
 from repositories.document_repository import DocumentRepository
 from services.nlp_analysis_service import NLPAnalysisService
 from utils.file_storage import FileStorageService
-
+from repositories.document_chunk_repository import DocumentChunkRepository
+from services.text_chunking_service import TextChunkingService
 
 class DocumentService:
 
@@ -12,6 +13,8 @@ class DocumentService:
         self.document_repository = DocumentRepository()
         self.nlp_service = NLPAnalysisService()
         self.file_storage_service = FileStorageService()
+        self.chunk_repository = DocumentChunkRepository()
+        self.chunking_service = TextChunkingService()
 
     def ingest_analyze_and_save(
         self,
@@ -185,6 +188,83 @@ class DocumentService:
             )
 
             return filtered_documents
+        
+    def create_chunks_for_documents(
+        self,
+        db,
+        document_id:int,
+        chunk_size: int=500,
+        overlap: int=50
+    )-> dict | None:
+        
+        document = self.document_repository.get_document_by_id(
+            db=db,
+            document_id=document_id
+        )
+
+        if not document:
+            return None
+            
+        chunks=self.chunking_service.chunk_text(
+            text=document.raw_text,
+            chunk_size=chunk_size,
+            overlap=overlap
+        )
+
+        self.chunk_repository.delete_chunks_by_document_id(
+            db=db,
+            document_id=document_id
+        )
+
+        saved_chunks = self.chunk_repository.create_chunks(
+            db=db,
+            document_id=document_id,
+            chunks=chunks
+        )
+
+        return {
+            "message": "Document chunks created successfully",
+            "document_id": document.document_id,
+            "title": document.title,
+            "chunk_count": len(saved_chunks),
+            "chunk_size": chunk_size,
+            "overlap": overlap
+        }
+        
+    def get_chunks_for_document(
+            self,
+            db,
+            document_id: int
+        ) -> dict | None:
+
+            document = self.document_repository.get_document_by_id(
+                db=db,
+                document_id=document_id
+            )
+
+            if not document:
+                return None
+
+            chunks = self.chunk_repository.get_chunks_by_document_id(
+                db=db,
+                document_id=document_id
+            )
+
+            return {
+                "document_id": document.document_id,
+                "title": document.title,
+                "chunk_count": len(chunks),
+                "chunks": [
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "chunk_index": chunk.chunk_index,
+                        "chunk_text": chunk.chunk_text,
+                        "word_count": chunk.word_count,
+                        "char_count": chunk.char_count
+                    }
+                    for chunk in chunks
+                ]
+            }
 
     def _document_has_keyword(
         self,

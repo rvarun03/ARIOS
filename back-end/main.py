@@ -23,7 +23,9 @@ from services.corpus_service import get_corpus
 
 
 from models.document import Document
-from routes.document import  router as document_router
+from models.document_chunk import DocumentChunk
+
+from routes.document import router as document_router
 
 from core.database import (
     Base,
