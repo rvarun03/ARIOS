@@ -6,6 +6,8 @@ from services.nlp_analysis_service import NLPAnalysisService
 from utils.file_storage import FileStorageService
 from repositories.document_chunk_repository import DocumentChunkRepository
 from services.text_chunking_service import TextChunkingService
+from services.embedding_service import EmbeddingService
+from services.vector_store_services import VectorStoreService
 
 class DocumentService:
 
@@ -15,6 +17,8 @@ class DocumentService:
         self.file_storage_service = FileStorageService()
         self.chunk_repository = DocumentChunkRepository()
         self.chunking_service = TextChunkingService()
+        self.embedding_service = EmbeddingService()
+        self.vector_store_service = VectorStoreService()
 
     def ingest_analyze_and_save(
         self,
@@ -265,6 +269,116 @@ class DocumentService:
                     for chunk in chunks
                 ]
             }
+
+    def generate_embeddings_for_document(
+        self,
+        db,
+        document_id: int
+    ) -> dict | None:    
+        
+        document = self.document_repository.get_document_by_id(
+            db=db,
+            document_id=document_id
+        )
+
+        if not document:
+            return None
+        
+        chunks=self.chunk_repository.get_chunks_by_document_id(
+            db=db,
+            document_id=document_id
+        )
+
+        if not chunks:
+            return {
+                "document_id": document.document_id,
+                "title": document.title,
+                "message": "No chunks found. Create chunks first.",
+                "embeddings": []
+            }
+        
+        embeddings = self.embedding_service.embed_chunks(
+            chunks=chunks
+        )
+
+        return {
+            "document_id": document.document_id,
+            "title": document.title,
+            "chunk_count": len(chunks),
+            "embedding_count": len(embeddings),
+            "embeddings": embeddings
+        }
+    
+    def store_document_embeddings(
+        self,
+        db,
+        document_id: int
+    ) -> dict | None:
+        
+        document = self.document_repository.get_document_by_id(
+            db=db,
+            document_id=document_id
+        )
+
+        if not document:
+            return None
+        
+        chunks=self.chunk_repository.get_chunks_by_document_id(
+            db=db,
+            document_id=document_id
+        )
+
+        if not chunks:
+            return {
+                "document_id": document.document_id,
+                "title": document.title,
+                "message": "No chunks found. Create chunks first.",
+                "stored_count": 0
+            }
+        
+        embeddings = self.embedding_service.embed_chunk_texts(
+            chunks=chunks
+        )
+
+        result = self.vector_store_service.add_document_chunks(
+            document=document,
+            chunks=chunks,
+            embeddings=embeddings
+        )
+
+        return {
+            "message": "Document chunk embeddings stored in ChromaDB",
+            "document_id": document.document_id,
+            "title": document.title,
+            "chunk_count": len(chunks),
+            "stored_count": result["stored_count"]
+        }
+    
+    def semantic_search(
+        self,
+        query: str,
+        top_k: int = 5,
+        source_type: str | None = None,
+        document_id: int | None = None
+    ) -> dict:
+
+        query_embedding = self.embedding_service.embed_text(
+            query
+        )
+
+        results = self.vector_store_service.search_similar_chunks(
+            query_embedding=query_embedding,
+            top_k=top_k,
+            source_type=source_type,
+            document_id=document_id
+        )
+
+        return {
+            "query": query,
+            "top_k": top_k,
+            "result_count": len(results),
+            "results": results
+        }
 
     def _document_has_keyword(
         self,

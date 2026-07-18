@@ -84,7 +84,7 @@ def create_document_chunks(
     db: Session = Depends(get_db)
 ):
 
-    result = document_service.create_chunks_for_document(
+    result = document_service.create_chunks_for_documents(
         db=db,
         document_id=document_id,
         chunk_size=chunk_size,
@@ -107,6 +107,44 @@ def get_document_chunks(
 ):
 
     result = document_service.get_chunks_for_document(
+        db=db,
+        document_id=document_id
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    return result
+
+@router.post("/{document_id}/embeddings")
+def generate_document_embeddings(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+
+    result = document_service.generate_embeddings_for_document(
+        db=db,
+        document_id=document_id
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    return result
+
+@router.post("/{document_id}/vector-store")
+def store_document_embeddings(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+
+    result = document_service.store_document_embeddings(
         db=db,
         document_id=document_id
     )

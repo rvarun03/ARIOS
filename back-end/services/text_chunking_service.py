@@ -6,7 +6,7 @@ class TextChunkingService:
     Later we can upgrade this to token-based chunking.
     """
 
-    def text_chunk(
+    def chunk_text(
         self,
         text:str,
         chunk_size:int=500,
