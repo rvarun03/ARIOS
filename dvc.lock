@@ -1,0 +1,64 @@
+schema: '2.0'
+stages:
+  preprocess_documents:
+    cmd: python -m scripts.preprocess_documents
+    deps:
+    - path: datasets/raw
+      hash: md5
+      md5: e0731104cc3379e41a57774548b95245.dir
+      size: 15871735
+      nfiles: 9
+    - path: ingestion
+      hash: md5
+      md5: c5d6c4307807d7620ec75a599de69dce.dir
+      size: 7521
+      nfiles: 6
+    - path: scripts/preprocess_documents.py
+      hash: md5
+      md5: 356e0877a63633b8d7ddec6a3d8dcb25
+      size: 3469
+    outs:
+    - path: datasets/processed/documents.jsonl
+      hash: md5
+      md5: 313ea17bc55e788f22f33e8397ab0153
+      size: 1466205
+  chunk_documents:
+    cmd: python -m scripts.chunk_documents
+    deps:
+    - path: datasets/processed/documents.jsonl
+      hash: md5
+      md5: 313ea17bc55e788f22f33e8397ab0153
+      size: 1466205
+    - path: scripts/chunk_documents.py
+      hash: md5
+      md5: 56e10115e143a99f0c36a53a5821ebfa
+      size: 2223
+    - path: services/text_chunking_service.py
+      hash: md5
+      md5: b1e61e6e09ed77b7432117e26c527582
+      size: 1466
+    outs:
+    - path: datasets/chunks/chunks.jsonl
+      hash: md5
+      md5: 9a836429d334ee0fd3374bc75dad2f0a
+      size: 1774733
+  embed_chunks:
+    cmd: python -m scripts.embed_documents
+    deps:
+    - path: datasets/chunks/chunks.jsonl
+      hash: md5
+      md5: 9a836429d334ee0fd3374bc75dad2f0a
+      size: 1774733
+    - path: scripts/embed_documents.py
+      hash: md5
+      md5: ab379e7a39d78d3ef36774c9b5b6363e
+      size: 2035
+    - path: services/embedding_service.py
+      hash: md5
+      md5: dd7781170716cf5a39ef1b353684d119
+      size: 1291
+    outs:
+    - path: artifacts/embeddings/chunk_embeddings.jsonl
+      hash: md5
+      md5: 18e09f43aed826f1380e43a7b68b518c
+      size: 6171510

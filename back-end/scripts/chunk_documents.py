@@ -2,10 +2,11 @@ import json
 import sys
 from pathlib import Path
 
-from core.paths import BACKEND_DIR,PROJECT_ROOT,OUTPUT_FILE,CHUNK_DIRECTORY
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 sys.path.append(str(BACKEND_DIR))
 
+from core.paths import OUTPUT_FILE, CHUNK_DIRECTORY
 from services.text_chunking_service import TextChunkingService
 
 CHUNK_SIZE = 500
@@ -26,7 +27,7 @@ def read_jsonl(
         for line in file:
             if line.strip():
                 records.append(
-                    json.load(line)
+                    json.loads(line)
                 )
 
     return records
@@ -85,11 +86,11 @@ def main():
             )
     write_jsonl(
         records=all_chunks,
-        output_file=OUTPUT_FILE
+        output_file=CHUNK_DIRECTORY
     )   
 
     print(
-        f"Saved {len(all_chunks)} chunks to {OUTPUT_FILE}"
+        f"Saved {len(all_chunks)} chunks to {CHUNK_DIRECTORY}"
     )     
 
 if __name__ == "__main__":

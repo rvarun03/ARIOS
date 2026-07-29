@@ -1,11 +1,13 @@
-import sys
 import json
-from core.paths import BACKEND_DIR, PROJECT_ROOT, RAW_DIR,OUTPUT_FILE
 from pathlib import Path
-from ingestion.ingestion_router import ingest
+import sys
 
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 sys.path.append(str(BACKEND_DIR))
+
+from core.paths import RAW_DIR, OUTPUT_FILE
+from ingestion.ingestion_router import ingest
 
 
 def write_jsonl(
@@ -34,7 +36,7 @@ def collect_web_sources()->list[dict]:
 
     urls_file = RAW_DIR / "web" / "urls.txt"
 
-    if not urls_file:
+    if not urls_file.exists():
         return sources
     
     with urls_file.open("r", encoding="utf-8") as file:
@@ -42,7 +44,7 @@ def collect_web_sources()->list[dict]:
         urls=[
             line.strip()
             for line in file.readlines()
-            if line.strip
+            if line.strip()
         ]
 
         for url in urls:
@@ -73,6 +75,8 @@ def collect_pdf_sources()-> list[dict]:
                 "source": str(pdf_file)
             }
         )       
+
+    return sources
 
 def collect_image_sources() -> list[dict]:
 

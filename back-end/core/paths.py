@@ -7,9 +7,9 @@ PROJECT_ROOT= BACKEND_DIR.parent
 
 ####################################   DVC DIRECTORIES  #################################
 
-RAW_DIR = PROJECT_ROOT / "datasets" / "raw"
-OUTPUT_FILE = PROJECT_ROOT / "datasets" / "processed" / "documents.jsonl"
+RAW_DIR = BACKEND_DIR / "datasets" / "raw"
+OUTPUT_FILE = BACKEND_DIR / "datasets" / "processed" / "documents.jsonl"
 
-CHUNK_DIRECTORY= PROJECT_ROOT / "datasets" / "chunks" / "chunks.jsonl"
+CHUNK_DIRECTORY= BACKEND_DIR / "datasets" / "chunks" / "chunks.jsonl"
 
-EMBED_FILE = PROJECT_ROOT / "artifacts" / "embeddings" / "chunk_embeddings.jsonl"
+EMBED_FILE = BACKEND_DIR / "artifacts" / "embeddings" / "chunk_embeddings.jsonl"

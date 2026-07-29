@@ -48,7 +48,7 @@ def ingest_web(url:str) -> IngestionOutput:
             }
         )   
 
-    except:
+    except Exception as e:
          return IngestionOutput(
             source_type="web",
             source_url=url,

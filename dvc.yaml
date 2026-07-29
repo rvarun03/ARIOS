@@ -6,7 +6,7 @@ stages:
   preprocess_documents:
     wdir: back-end
 
-    cmd: python scripts/preprocess_documents.py
+    cmd: python -m scripts.preprocess_documents
     deps:
       - ${scripts_dir}/preprocess_documents.py
       - ingestion
@@ -15,21 +15,21 @@ stages:
       - datasets/processed/documents.jsonl
 
   chunk_documents:
-
-    cmd: python ${scripts_dir}/chunk_documents.py
+    wdir: back-end
+    cmd: python -m scripts.chunk_documents
     deps:
       - ${scripts_dir}/chunk_documents.py
-      - back-end/services/text_chunking_service.py
+      - services/text_chunking_service.py
       - datasets/processed/documents.jsonl
     outs:
       - datasets/chunks/chunks.jsonl
 
   embed_chunks:
-
-    cmd: python ${scripts_dir}/embed_chunks.py
+    wdir: back-end
+    cmd: python -m scripts.embed_documents
     deps:
-      - ${scripts_dir}/embed_chunks.py
-      - back-end/services/embedding_service.py
+      - ${scripts_dir}/embed_documents.py
+      - services/embedding_service.py
       - datasets/chunks/chunks.jsonl
     outs:
       - artifacts/embeddings/chunk_embeddings.jsonl    

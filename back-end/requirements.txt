@@ -1,0 +1,7 @@
+beautifulsoup4
+easyocr
+GitPython
+PyMuPDF
+requests
+sentence-transformers
+youtube-transcript-api
