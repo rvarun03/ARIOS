@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     ## DATABASE 
     DATABASE_URL: str
 
-
+    groq_api_key: str
+    groq_model: str = "llama-3.1-8b-instant"
+    
     class Config:
         env_file = ".env"
 

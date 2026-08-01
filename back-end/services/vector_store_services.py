@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import chromadb
+from core.paths import BACKEND_DIR
 
 class VectorStoreService:
     """
@@ -9,15 +10,17 @@ class VectorStoreService:
 
     def __init__(self):
 
-        self.client=chromadb.PersistentClient(
-            path=str(Path("chroma_db"))
+        self.client = chromadb.PersistentClient(
+            path=str(BACKEND_DIR / "chroma_db")
         )
 
         self.collection = self.client.get_or_create_collection(
             name="document_chunks"
         )
 
-
+    def count_chunks(self) -> int:
+        return self.collection.count()
+    
     def add_document_chunks(
         self,
         document,
@@ -35,7 +38,7 @@ class VectorStoreService:
                 f"document_{document.document_id}_chunk_{chunk.chunk_id}"
             )
 
-            documents.append(chunk.text)
+            documents.append(chunk.chunk_text)
 
             metadatas.append(
                 {

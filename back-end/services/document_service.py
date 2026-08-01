@@ -8,6 +8,7 @@ from repositories.document_chunk_repository import DocumentChunkRepository
 from services.text_chunking_service import TextChunkingService
 from services.embedding_service import EmbeddingService
 from services.vector_store_services import VectorStoreService
+from services.RAG_service import RAGService
 
 class DocumentService:
 
@@ -19,6 +20,7 @@ class DocumentService:
         self.chunking_service = TextChunkingService()
         self.embedding_service = EmbeddingService()
         self.vector_store_service = VectorStoreService()
+        self.rag_service = RAGService()
 
     def ingest_analyze_and_save(
         self,
@@ -48,9 +50,18 @@ class DocumentService:
             nlp_metadata=analysis_result["analysis"]
         )
 
-        return self._format_saved_document(
+        index_result = self.index_document(
+            db=db,
+            document_id=saved_document.document_id
+        )
+
+        response = self._format_saved_document(
             saved_document=saved_document
         )
+
+        response["indexing"] = index_result
+        
+        return response
 
     def upload_analyze_and_save(
         self,
@@ -380,6 +391,38 @@ class DocumentService:
             "results": results
         }
 
+    def ask_question(
+        self,
+        question:str,
+        top_k: int = 5,
+        source_type: str | None = None,
+        document_id: int | None = None
+    ):
+        search_result = self.semantic_search(
+            query=question,
+            top_k=top_k,
+            source_type=source_type,
+            document_id=document_id
+        )
+
+        retrieved_chunks = search_result.get("results", [])
+
+        if not retrieved_chunks:
+            return {
+                "question": question,
+                "answer": "I could not find this information in the provided documents.",
+                "source_count": 0,
+                "sources": []
+            }
+
+        context = self.rag_service.build_context(
+            retrieved_chunks=retrieved_chunks
+        )
+
+        print(context)
+
+        return context
+
     def _document_has_keyword(
         self,
         document,
@@ -467,4 +510,61 @@ class DocumentService:
             "file_path": document.file_path,
             "statistics": statistics,
             "created_at": document.created_at
+        }
+
+    def get_vector_store_count(self) -> dict:
+        return {
+            "collection": "document_chunks",
+            "stored_chunk_count": self.vector_store_service.count_chunks()
+        }
+
+    ####################### Main function #######################
+
+    def index_document(
+        self,
+        db,
+        document_id:int,
+        chunk_size: int = 500,
+        overlap: int = 50
+    ) -> dict | None:
+
+        document = self.document_repository.get_document_by_id(
+            db=db,
+            document_id=document_id
+        )
+
+        if not document:
+            return None
+
+        chunks = self.chunking_service.chunk_text(
+            text=document.raw_text,
+            chunk_size=chunk_size,
+            overlap=overlap
+        )
+
+        self.chunk_repository.delete_chunks_by_document_id(
+            db=db,
+            document_id=document_id
+        )
+
+        saved_chunks = self.chunk_repository.create_chunks(
+            db=db,
+            document_id=document.document_id,
+            chunks=chunks
+        )
+
+        embeddings = self.embedding_service.embed_chunk_texts(
+            chunks=saved_chunks
+        )
+
+        vector_result = self.vector_store_service.add_document_chunks(
+            document=document,
+            chunks=saved_chunks,
+            embeddings=embeddings
+        )
+
+        return {
+            "document_id": document.document_id,
+            "chunk_count": len(saved_chunks),
+            "stored_vector_count": vector_result["stored_count"]
         }

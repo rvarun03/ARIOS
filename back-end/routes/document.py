@@ -9,6 +9,8 @@ from core.database import get_db
 from schemas.document import DocumentIngestRequest
 from services.document_service import DocumentService
 
+from schemas.rag_schema import AskDocumentRequest
+
 
 router = APIRouter(
     prefix="/documents",
@@ -74,6 +76,21 @@ def search_documents(
         source_type=source_type,
         keyword=keyword,
         entity=entity
+    )
+
+@router.get("/semantic-search")
+def semantic_search_documents(
+    query: str,
+    top_k: int = 5,
+    source_type: str | None = None,
+    document_id: int | None = None
+):
+
+    return document_service.semantic_search(
+        query=query,
+        top_k=top_k,
+        source_type=source_type,
+        document_id=document_id
     )
 
 @router.post("/{document_id}/chunks")
@@ -175,3 +192,20 @@ def get_document(
         )
 
     return document
+
+@router.get("/vector-store/count")
+def get_vector_store_count():
+
+    return document_service.get_vector_store_count()
+
+@router.post("/ask")
+def ask_documents(
+    request: AskDocumentRequest
+):
+
+    return document_service.ask_question(
+        question=request.question,
+        top_k=request.top_k,
+        source_type=request.source_type,
+        document_id=request.document_id
+    )
