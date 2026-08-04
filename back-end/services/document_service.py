@@ -9,6 +9,7 @@ from services.text_chunking_service import TextChunkingService
 from services.embedding_service import EmbeddingService
 from services.vector_store_services import VectorStoreService
 from services.RAG_service import RAGService
+from services.llm_service import LLM_Service
 
 class DocumentService:
 
@@ -21,7 +22,7 @@ class DocumentService:
         self.embedding_service = EmbeddingService()
         self.vector_store_service = VectorStoreService()
         self.rag_service = RAGService()
-
+        self.llm_service= LLM_Service()
     def ingest_analyze_and_save(
         self,
         db,
@@ -46,6 +47,7 @@ class DocumentService:
             source_type=analysis_result["source_type"],
             source_url=analysis_result["source_url"],
             raw_text=ingestion_result.raw_text,
+            cleaned_text=analysis_result["text"]["cleaned_text"],
             cleaned_text_preview=analysis_result["text"]["preview"],
             nlp_metadata=analysis_result["analysis"]
         )
@@ -97,6 +99,7 @@ class DocumentService:
             source_type=analysis_result["source_type"],
             source_url=analysis_result["source_url"],
             raw_text=ingestion_result.raw_text,
+            cleaned_text=analysis_result["text"]["cleaned_text"],
             cleaned_text_preview=analysis_result["text"]["preview"],
             nlp_metadata=analysis_result["analysis"],
             file_name=saved_file["file_name"],
@@ -149,19 +152,18 @@ class DocumentService:
     ) -> dict:
 
         return {
-            "message": "Document saved successfully",
             "document_id": saved_document.document_id,
             "title": saved_document.title,
             "source_type": saved_document.source_type,
             "source_url": saved_document.source_url,
-            "file": {
-                "file_name": saved_document.file_name,
-                "file_path": saved_document.file_path,
-                "file_type": saved_document.file_type,
-                "file_size": saved_document.file_size
-            },
+            "file_name": saved_document.file_name,
+            "file_path": saved_document.file_path,
+            "file_type": saved_document.file_type,
+            "file_size": saved_document.file_size,
+            "raw_text_length": len(saved_document.raw_text or ""),
+            "cleaned_text_length": len(saved_document.cleaned_text or ""),
             "cleaned_text_preview": saved_document.cleaned_text_preview,
-            "analysis": saved_document.nlp_metadata,
+            "nlp_metadata": saved_document.nlp_metadata,
             "created_at": saved_document.created_at
         }
     
@@ -391,8 +393,40 @@ class DocumentService:
             "results": results
         }
 
+    def _get_documents_from_retrieved_chunks(
+        self,
+        db,
+        retrieved_chunks: list[dict]
+    ):
+
+        document_ids = set()
+
+        for result in retrieved_chunks:
+            metadata = result.get("metadata", {})
+
+            document_id = metadata.get("document_id")
+
+            if document_id is not None:
+                document_ids.add(
+                    int(document_id)
+                )
+
+        documents = []
+
+        for document_id in document_ids:
+            document = self.document_repository.get_document_by_id(
+                db=db,
+                document_id=document_id
+            )
+
+            if document:
+                documents.append(document)
+
+        return documents
+
     def ask_question(
         self,
+        db,
         question:str,
         top_k: int = 5,
         source_type: str | None = None,
@@ -419,9 +453,27 @@ class DocumentService:
             retrieved_chunks=retrieved_chunks
         )
 
-        print(context)
+        documents = self._get_documents_from_retrieved_chunks(
+            db=db,
+            retrieved_chunks=retrieved_chunks
+        )
 
-        return context
+        metadata_context = self.rag_service.build_metadata_context(
+            documents=documents
+        )
+
+        
+        prompt = self.rag_service.build_prompt(
+            question=question,
+            context=context,
+            metadata_context=metadata_context
+        )
+
+        answer = self.llm_service.generate_answer(
+            prompt=prompt
+        )
+
+        return answer
 
     def _document_has_keyword(
         self,
@@ -536,8 +588,10 @@ class DocumentService:
         if not document:
             return None
 
+        text_for_indexing = document.cleaned_text or document.raw_text
+
         chunks = self.chunking_service.chunk_text(
-            text=document.raw_text,
+            text=text_for_indexing,
             chunk_size=chunk_size,
             overlap=overlap
         )
@@ -566,5 +620,6 @@ class DocumentService:
         return {
             "document_id": document.document_id,
             "chunk_count": len(saved_chunks),
-            "stored_vector_count": vector_result["stored_count"]
+            "stored_vector_count": vector_result["stored_count"],
+            "indexed_text": "cleaned_text" if document.cleaned_text else "raw_text"
         }

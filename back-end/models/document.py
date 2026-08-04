@@ -56,6 +56,8 @@ class Document(Base):
         nullable=False
     )
 
+    cleaned_text = Column(Text, nullable=True)
+
     cleaned_text_preview = Column(
         Text,
         nullable=True

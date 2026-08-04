@@ -12,6 +12,7 @@ class DocumentRepository:
         source_type: str,
         source_url: str | None,
         raw_text: str,
+        cleaned_text: str | None,
         cleaned_text_preview: str,
         nlp_metadata: dict,
         file_name: str | None = None,
@@ -29,6 +30,7 @@ class DocumentRepository:
             file_type=file_type,
             file_size=file_size,
             raw_text=raw_text,
+            cleaned_text=cleaned_text,
             cleaned_text_preview=cleaned_text_preview,
             nlp_metadata=nlp_metadata
         )

@@ -44,7 +44,7 @@ class NLPAnalysisService:
         )
 
         doc=self.processor.tokenize(
-            normalised_text
+            cleaned_text
         )
 
         entities= self.ner_extractor.extract(
@@ -77,6 +77,7 @@ class NLPAnalysisService:
                 "raw_text_length": len(raw_text),
                 "cleaned_text_length": len(cleaned_text),
                 "normalised_text_length": len(normalised_text),
+                "cleaned_text": cleaned_text,
                 "preview": cleaned_text[:1000]
             },
             "analysis": analysis

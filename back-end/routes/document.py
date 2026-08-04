@@ -200,12 +200,14 @@ def get_vector_store_count():
 
 @router.post("/ask")
 def ask_documents(
-    request: AskDocumentRequest
+    request: AskDocumentRequest,
+    db: Session = Depends(get_db)
 ):
 
     return document_service.ask_question(
         question=request.question,
         top_k=request.top_k,
+        db=db,
         source_type=request.source_type,
         document_id=request.document_id
     )
