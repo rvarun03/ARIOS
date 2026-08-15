@@ -3,6 +3,7 @@ from nlp.NER import NER
 from nlp.keyword_extractor import KeywordExtractor
 from nlp.extractive_summarizer import ExtractiveSummarizer
 from nlp.document_analyser import DocumentAnalyzer
+from services.transformer_classifier_service import TransformerClassifierService
 
 class NLPAnalysisService:
     
@@ -26,6 +27,7 @@ class NLPAnalysisService:
         self.keyword_extractor = KeywordExtractor()
         self.summarizer = ExtractiveSummarizer()
         self.document_analyzer = DocumentAnalyzer()
+        self.transformer_classifier = TransformerClassifierService()
 
     def analyse_document(
         self,
@@ -38,8 +40,8 @@ class NLPAnalysisService:
         cleaned_text=self.processor.clean_text(
             raw_text
         )
-
         normalised_text= self.processor.normalize_text(
+
             cleaned_text
         )
 
@@ -62,12 +64,18 @@ class NLPAnalysisService:
             max_sentences=max_summary_sentences
         )
 
+        transformer_analysis = self.transformer_classifier.classify_documents(
+            cleaned_text
+        )
+
         analysis = self.document_analyzer.analyse(
             doc=doc,
             keywords=keywords,
             entities=entities,
             summary=summary
         )
+
+        analysis["metadata"]["transformer_analysis"] = transformer_analysis
         
         return {
             "title": ingestion_result.title,

@@ -23,6 +23,7 @@ class DocumentService:
         self.vector_store_service = VectorStoreService()
         self.rag_service = RAGService()
         self.llm_service= LLM_Service()
+        
     def ingest_analyze_and_save(
         self,
         db,
@@ -473,7 +474,11 @@ class DocumentService:
             prompt=prompt
         )
 
-        return answer
+        # LLMs may still wrap labels in quotes even when the prompt asks them
+        # not to. Remove those presentation characters before JSON encoding.
+        clean_answer = answer.strip().replace('"', "")
+
+        return clean_answer
 
     def _document_has_keyword(
         self,
