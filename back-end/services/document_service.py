@@ -478,7 +478,93 @@ class DocumentService:
         # not to. Remove those presentation characters before JSON encoding.
         clean_answer = answer.strip().replace('"', "")
 
-        return clean_answer
+        evaluation = self._build_rag_evaluation(
+            retrieved_chunks=retrieved_chunks,
+            documents=documents,
+            top_k=top_k,
+            metadata_used=bool(metadata_context)
+        )
+
+        return {
+        "question": question,
+        "answer": clean_answer,
+        "metadata_used": bool(metadata_context),
+        "evaluation": evaluation
+    }
+
+
+    def build_rag_evaluation(
+        self,
+        retrieved_chunks: list[dict],
+        documents: list,
+        top_k: int,
+        metadata_used: bool
+    ):
+
+        distances=[]
+
+        for chunk in retrieved_chunks:
+
+            distance = chunk.get("distance")
+
+            if distance is not None:
+                distances.append(float(distance))
+
+        average_distance = None
+        best_distance = None
+        worst_distance = None
+
+        if distances:
+
+            average_distance = round(
+                sum(distances)/len(distances),
+                4
+            )
+            best_distance = round(
+                min(distances),
+                4
+            )
+
+            worst_distance = round(
+                max(distances),
+                4
+            )    
+
+        document_type = None
+        best_predicted_label = None
+        document_type_confidence = None
+        confidence_threshold = None    
+
+        if documents:
+
+            first_document=documents[0]
+
+            nlp_metadata= first_document.get("metadata",{})
+
+            transformer_analysis= (
+                nlp_metadata.get("metadata",{})
+                .get("transformer_analysis", {})
+            )
+
+            document_type = transformer_analysis.get("document_type")
+            best_predicted_label = transformer_analysis.get("best_predicted_label")
+            document_type_confidence = transformer_analysis.get("confidence")
+            confidence_threshold = transformer_analysis.get("confidence_threshold")
+
+        return {
+            "retrieved_chunk_count": len(retrieved_chunks),
+            "requested_top_k": top_k,
+            "metadata_used": metadata_used,
+            "answer_generated": True,
+            "average_distance": average_distance,
+            "best_distance": best_distance,
+            "worst_distance": worst_distance,
+            "document_type": document_type,
+            "best_predicted_label": best_predicted_label,
+            "document_type_confidence": document_type_confidence,
+            "confidence_threshold": confidence_threshold
+        }    
+
 
     def _document_has_keyword(
         self,
