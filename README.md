@@ -282,7 +282,6 @@ This demonstrates document ingestion, text processing, and the generated analysi
 
 This demonstrates a user question, the generated answer, and the retrieved source context.
 
-> Add the corresponding image files under `docs/screenshots/` when screenshots are available.
 
 ## Engineering decisions
 
@@ -294,43 +293,6 @@ This demonstrates a user question, the generated answer, and the retrieved sourc
 - **Metadata filters:** restrict retrieval to a source category or a single document, improving control and reducing irrelevant context.
 - **Grounded generation:** the RAG prompt limits the LLM to retrieved content and defines an explicit fallback when the answer is absent. This reduces unsupported answers, though it cannot guarantee factual output.
 
-## Current limitations
 
-- SQLite and ChromaDB are local, single-instance storage choices; no migration or distributed-storage strategy is included.
-- The BART classifier, Sentence Transformer, spaCy pipeline, ChromaDB client, and Groq client are initialized with the service, increasing startup time and memory use.
-- RAG answer quality depends on the ingested text, chunking, retrieval results, and external LLM behavior.
-- The answer endpoint returns plain answer text rather than structured source citations.
-- PDF and image uploads are analysed and saved but are not automatically chunked or indexed.
-- Re-indexing a document can attempt to add duplicate ChromaDB IDs because old vectors are not deleted or upserted.
-- `GET /documents/vector-store/count` is declared after the dynamic `/{document_id}` GET route and may be interpreted as a document ID by FastAPI's route order.
-- The document keyword/entity search currently returns from inside its loop, so it may omit later matches; it may also return `null` when no documents are present.
-- Several ingestors convert extraction failures into empty documents instead of returning explicit API errors.
-- There is no authentication, authorization, rate limiting, frontend client, or production deployment configuration.
-- Automated coverage is limited to a tokenizer experiment rather than a complete unit/integration test suite.
-- `requirements.txt` does not yet provide a complete reproducible environment.
-
-## Future improvements
-
-- Add authentication and isolate collections by user.
-- Add retrieval benchmarks, relevance metrics, and regression evaluation.
-- Rerank retrieved chunks before prompt construction.
-- Return structured source citations with every answer.
-- Stream generated answers to the client.
-- Add database migrations, cloud-backed storage, and cloud deployment configuration.
-- Add unit, integration, and end-to-end API tests.
-- Make indexing idempotent and unify upload and URL ingestion behavior.
-- Pin and consolidate all runtime dependencies.
-
-## What I learned
-
-Building ARIOS provided practical experience in designing a layered FastAPI backend, normalizing multiple content sources behind one ingestion interface, persisting structured NLP results with SQLAlchemy, and combining deterministic NLP with Transformer inference. It also developed hands-on understanding of embedding generation, chunking trade-offs, ChromaDB metadata filtering, context construction for RAG, and the operational cost of loading multiple ML models in an API process.
-
-## Author and contact
-
-Developed by **Varun**.
-
-- GitHub: [rvarun03](https://github.com/rvarun03)
-- LinkedIn: `<add-linkedin-profile-url>`
-- Email: `<add-professional-email>`
 
 For questions, feedback, or collaboration, open an issue in the [ARIOS repository](https://github.com/rvarun03/ARIOS/issues).

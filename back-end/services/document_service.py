@@ -493,7 +493,7 @@ class DocumentService:
     }
 
 
-    def build_rag_evaluation(
+    def _build_rag_evaluation(
         self,
         retrieved_chunks: list[dict],
         documents: list,
@@ -539,7 +539,7 @@ class DocumentService:
 
             first_document=documents[0]
 
-            nlp_metadata= first_document.get("metadata",{})
+            nlp_metadata = first_document.nlp_metadata or {}
 
             transformer_analysis= (
                 nlp_metadata.get("metadata",{})
