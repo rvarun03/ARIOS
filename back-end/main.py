@@ -26,6 +26,7 @@ from models.document import Document
 from models.document_chunk import DocumentChunk
 
 from routes.document import router as document_router
+from routes.aws import router as aws_router
 
 from core.database import (
     Base,
@@ -45,6 +46,7 @@ app.include_router(health_router)
 app.include_router(
     document_router
 )
+app.include_router(aws_router)
 
 @app.get("/")
 def root():

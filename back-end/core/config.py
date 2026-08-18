@@ -11,7 +11,13 @@ class Settings(BaseSettings):
 
     groq_api_key: str
     groq_model: str = "llama-3.1-8b-instant"
-    
+
+    # AWS S3
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: str = "ap-south-1"
+    AWS_S3_BUCKET_NAME: str
+
     class Config:
         env_file = ".env"
 
