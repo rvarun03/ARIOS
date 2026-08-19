@@ -18,7 +18,10 @@ class DocumentRepository:
         file_name: str | None = None,
         file_path: str | None = None,
         file_type: str | None = None,
-        file_size: int | None = None
+        file_size: int | None = None,
+        s3_key: str | None = None,
+        s3_uri: str | None = None,
+        s3_bucket: str | None = None
     ) -> Document:
 
         document = Document(
@@ -29,6 +32,9 @@ class DocumentRepository:
             file_path=file_path,
             file_type=file_type,
             file_size=file_size,
+            s3_key=s3_key,
+            s3_uri=s3_uri,
+            s3_bucket=s3_bucket,
             raw_text=raw_text,
             cleaned_text=cleaned_text,
             cleaned_text_preview=cleaned_text_preview,

@@ -1,6 +1,9 @@
 import boto3
 from botocore.exceptions import ClientError
 from core.config import settings
+import uuid
+from pathlib import Path
+from fastapi import UploadFile
 
 class S3Service:
 
@@ -34,3 +37,49 @@ class S3Service:
                 "connected": False,
                 "error": str(error)
             }
+
+    def upload_file(
+        self,
+        file:UploadFile,
+        folder: str = "uploads"
+    ) -> dict:
+            
+        try:
+
+            original_file_name = file.filename or "uploaded_file"
+
+            safe_file_name = Path(original_file_name).name.replace(
+                "",
+                "_"
+            )
+
+            unique_file_name = f"{uuid.uuid4().hex}_{safe_file_name}"
+
+            s3_key = f"{folder}/{unique_file_name}"
+
+            extra_args = {}
+
+            if file.content_type:
+                extra_args["ContentType"] = file.content_type
+
+            file.file.seek(0)
+
+            self.client.upload_fileobj(
+                Fileobj=file.file,
+                Bucket=self.bucket_name,
+                Key=s3_key,
+                ExtraArgs=extra_args if extra_args else None
+            ) 
+
+            return {
+                "uploaded": True,
+                "bucket": self.bucket_name,
+                "region": self.region,
+                "s3_key": s3_key,
+                "s3_uri": f"s3://{self.bucket_name}/{s3_key}",
+                "file_name": original_file_name,
+                "content_type": file.content_type
+            }
+        
+        except:
+            pass

@@ -51,6 +51,20 @@ class Document(Base):
         nullable=True
     )
 
+    s3_key = Column(
+        String, 
+        nullable=True
+    )
+    s3_uri = Column(
+        String, 
+        nullable=True
+    )
+
+    s3_bucket = Column(
+        String, 
+        nullable=True
+    )
+
     raw_text = Column(
         Text,
         nullable=False

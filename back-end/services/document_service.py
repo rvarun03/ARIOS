@@ -10,6 +10,7 @@ from services.embedding_service import EmbeddingService
 from services.vector_store_services import VectorStoreService
 from services.RAG_service import RAGService
 from services.llm_service import LLM_Service
+from services.s3_service import S3Service
 
 class DocumentService:
 
@@ -23,6 +24,7 @@ class DocumentService:
         self.vector_store_service = VectorStoreService()
         self.rag_service = RAGService()
         self.llm_service= LLM_Service()
+        self.s3_service = S3Service()
         
     def ingest_analyze_and_save(
         self,
@@ -78,6 +80,19 @@ class DocumentService:
             source_type=source_type
         )
 
+        s3_upload_result = self.s3_service.upload_file(
+            file=file,
+            folder="uploads"
+        )
+
+        if not s3_upload_result.get("uploaded"):
+            return {
+                "uploaded": False,
+                "error": "File was saved locally but failed to upload to S3.",
+                "s3_error": s3_upload_result.get("error"),
+                "local_file": saved_file
+            }
+        
         ingestion_result = ingest(
             source_type=source_type,
             source=saved_file["file_path"]
@@ -106,12 +121,31 @@ class DocumentService:
             file_name=saved_file["file_name"],
             file_path=saved_file["file_path"],
             file_type=saved_file["file_type"],
-            file_size=saved_file["file_size"]
+            file_size=saved_file["file_size"],
+            s3_key=s3_upload_result["s3_key"],
+            s3_uri=s3_upload_result["s3_uri"],
+            s3_bucket=s3_upload_result["bucket"]
         )
 
-        return self._format_saved_document(
+        index_result = self.index_document(
+            db=db,
+            document_id=saved_document.document_id
+        )
+
+        response = self._format_saved_document(
             saved_document=saved_document
         )
+
+        response["s3"] = {
+            "uploaded": True,
+            "bucket": s3_upload_result["bucket"],
+            "s3_key": s3_upload_result["s3_key"],
+            "s3_uri": s3_upload_result["s3_uri"]
+        }
+
+        response["indexing"] = index_result
+
+        return response
 
     def get_all_documents(
         self,
@@ -161,6 +195,9 @@ class DocumentService:
             "file_path": saved_document.file_path,
             "file_type": saved_document.file_type,
             "file_size": saved_document.file_size,
+            "s3_key": saved_document.s3_key,
+            "s3_uri": saved_document.s3_uri,
+            "s3_bucket": saved_document.s3_bucket,
             "raw_text_length": len(saved_document.raw_text or ""),
             "cleaned_text_length": len(saved_document.cleaned_text or ""),
             "cleaned_text_preview": saved_document.cleaned_text_preview,
