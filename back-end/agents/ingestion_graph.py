@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, START, END
 from services.nlp_analysis_service import NLPAnalysisService
 from ingestion.ingestion_router import ingest
 from repositories.document_repository import DocumentRepository
+from services.document_service import DocumentService
 
 class IngestionGraphState(TypedDict):
     db: Any
@@ -22,6 +23,10 @@ class IngestionGraphState(TypedDict):
     document_type_confidence: float
     document_id: int | None
     saved_to_db: bool
+    indexed: bool
+    indexing_result: dict
+    chunk_count: int
+    stored_vector_count: int
     error: str | None
 
 def validate_input(state: IngestionGraphState)  -> IngestionGraphState:
@@ -164,10 +169,44 @@ def save_document_to_db(
         state["error"] = str(error)
         return state
 
+def index_document(
+    state: IngestionGraphState
+)-> IngestionGraphState:
+    
+    if not state["document_id"]:
+        state["indexed"] = False
+        state["success"] = False
+        state["error"] = "document_id is missing. Cannot index document."
+        return state
+
+    document_service= DocumentService()
+
+    indexing_result= document_service.index_document(
+        db= state["db"],
+        document_id=state["document_id"]
+    )
+
+    if not indexing_result:
+        state["indexed"] = False
+        state["success"] = False
+        state["error"] = "Indexing failed. Document was not found."
+        return state
+
+    state["indexed"] = True
+    state["indexing_result"] = indexing_result
+    state["chunk_count"] = indexing_result.get("chunk_count", 0)
+    state["stored_vector_count"] = indexing_result.get("stored_vector_count", 0)
+    state["success"] = True
+    state["error"] = None
+
+    return state
+
 def build_ingestion_graph():
 
     graph= StateGraph(IngestionGraphState)
 
+    ## adding nodes
+     
     graph.add_node(
         "validate_input",
         validate_input
@@ -183,14 +222,21 @@ def build_ingestion_graph():
         run_nlp_analysis
     )
 
-    graph.add_edge(
-        START,
-        "validate_input"
-    )
-
     graph.add_node(
         "save_document_to_db",
         save_document_to_db
+    )
+
+    graph.add_node(
+        "index_document",
+        index_document
+    )
+
+    ## adding edges
+
+    graph.add_edge(
+        START,
+        "validate_input"
     )
 
     graph.add_conditional_edges(
@@ -214,9 +260,14 @@ def build_ingestion_graph():
 
     graph.add_edge(
         "save_document_to_db",
+        "index_document"
+    )
+
+    graph.add_edge(
+        "index_document",
         END
     )
-    
+
     return graph.compile()
 
 source_routing_graph = build_ingestion_graph()
