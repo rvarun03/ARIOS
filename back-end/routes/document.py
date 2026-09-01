@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from schemas.document import DocumentIngestRequest
+from schemas.document import DocumentIngestRequest,AutoDocumentIngestRequest
 from services.document_service import DocumentService
 
 from schemas.rag_schema import AskDocumentRequest
 
+from agents.ingestion_graph import source_routing_graph
 
 router = APIRouter(
     prefix="/documents",
@@ -211,3 +212,54 @@ def ask_documents(
         source_type=request.source_type,
         document_id=request.document_id
     )
+
+
+@router.post("/graph/ingest")
+def graph_ingest_document(
+    request: AutoDocumentIngestRequest,
+    db: Session = Depends(get_db)
+):
+    initial_state = {
+        "db": db,
+        "source_type": "",
+        "source": request.source,
+        "is_valid": False,
+        "success": False,
+        "title": "",
+        "raw_text": "",
+        "source_url": None,
+        "metadata": {},
+        "analysis_result": {},
+        "cleaned_text_length": 0,
+        "document_type": "",
+        "document_type_confidence": 0.0,
+        "document_id": None,
+        "saved_to_db": False,
+        "indexed": False,
+        "indexing_result": {},
+        "chunk_count": 0,
+        "stored_vector_count": 0,
+        "error": None
+    }
+
+    result = source_routing_graph.invoke(
+        initial_state
+    )
+
+    return {
+        "success": result["success"],
+        "is_valid": result["is_valid"],
+        "document_id": result["document_id"],
+        "title": result["title"],
+        "source_type": result["source_type"],
+        "source_url": result["source_url"],
+        "cleaned_text_length": result["cleaned_text_length"],
+        "document_type": result["document_type"],
+        "document_type_confidence": result["document_type_confidence"],
+        "saved_to_db": result["saved_to_db"],
+        "indexed": result["indexed"],
+        "chunk_count": result["chunk_count"],
+        "stored_vector_count": result["stored_vector_count"],
+        "indexing_result": result["indexing_result"],
+        "error": result["error"]
+    }

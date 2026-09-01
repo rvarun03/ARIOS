@@ -6,6 +6,7 @@ from services.nlp_analysis_service import NLPAnalysisService
 from ingestion.ingestion_router import ingest
 from repositories.document_repository import DocumentRepository
 from services.document_service import DocumentService
+from services.source_type_detector import SourceTypeDetector
 
 class IngestionGraphState(TypedDict):
     db: Any
@@ -31,16 +32,19 @@ class IngestionGraphState(TypedDict):
 
 def validate_input(state: IngestionGraphState)  -> IngestionGraphState:
 
-    source_type=state['source_type']
     source=state['source']    
 
-    if not source or not source_type:
+    if not source :
 
         state['is_valid'] = False
         state["success"] = False
         state["error"] = "source_type and source are required."
 
         return state
+
+    detector= SourceTypeDetector()
+    detected_source_type=detector.detect(source)
+    
 
     allowed_source_types = {
         "web",
@@ -50,14 +54,16 @@ def validate_input(state: IngestionGraphState)  -> IngestionGraphState:
         "github"
     }
 
-    if source_type not in allowed_source_types:
+    if detected_source_type not in allowed_source_types:
 
         state["is_valid"] = False
         state["success"] = False
-        state["error"] = f"Unsupported source_type: {source_type}"
+        
         return state
 
+    state["source_type"] = detected_source_type
     state["is_valid"] = True
+    state["success"] = True
     state["error"] = None
 
     return state
@@ -169,6 +175,13 @@ def save_document_to_db(
         state["error"] = str(error)
         return state
 
+def route_after_db_save(state: IngestionGraphState) -> str:
+
+    if state["saved_to_db"] and state["document_id"]:
+        return "continue"
+
+    return "stop"
+
 def index_document(
     state: IngestionGraphState
 )-> IngestionGraphState:
@@ -258,9 +271,13 @@ def build_ingestion_graph():
         "save_document_to_db"
     )
 
-    graph.add_edge(
+    graph.add_conditional_edges(
         "save_document_to_db",
-        "index_document"
+        route_after_db_save,
+        {
+            "continue": "index_document",
+            "stop": END
+        }
     )
 
     graph.add_edge(
