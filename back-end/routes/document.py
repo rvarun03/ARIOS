@@ -228,6 +228,10 @@ def graph_ingest_document(
         "title": "",
         "raw_text": "",
         "source_url": None,
+        "file_name": None,
+        "file_path": None,
+        "file_type": None,
+        "file_size": None,
         "metadata": {},
         "analysis_result": {},
         "cleaned_text_length": 0,
@@ -253,6 +257,66 @@ def graph_ingest_document(
         "title": result["title"],
         "source_type": result["source_type"],
         "source_url": result["source_url"],
+        "cleaned_text_length": result["cleaned_text_length"],
+        "document_type": result["document_type"],
+        "document_type_confidence": result["document_type_confidence"],
+        "saved_to_db": result["saved_to_db"],
+        "indexed": result["indexed"],
+        "chunk_count": result["chunk_count"],
+        "stored_vector_count": result["stored_vector_count"],
+        "indexing_result": result["indexing_result"],
+        "error": result["error"]
+    }
+
+@router.post("/graph/upload")
+def graph_upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    saved_file = document_service.file_storage_service.save_uploaded_file(
+        file=file,
+        source_type="pdf"
+    )
+
+    initial_state = {
+        "db": db,
+        "source_type": "",
+        "source": saved_file["file_path"],
+        "is_valid": False,
+        "success": False,
+        "title": "",
+        "raw_text": "",
+        "source_url": None,
+        "file_name": saved_file["file_name"],
+        "file_path": saved_file["file_path"],
+        "file_type": saved_file["file_type"],
+        "file_size": saved_file["file_size"],
+        "metadata": {},
+        "analysis_result": {},
+        "cleaned_text_length": 0,
+        "document_type": "",
+        "document_type_confidence": 0.0,
+        "document_id": None,
+        "saved_to_db": False,
+        "indexed": False,
+        "indexing_result": {},
+        "chunk_count": 0,
+        "stored_vector_count": 0,
+        "error": None
+    }
+
+    result = source_routing_graph.invoke(initial_state)
+
+    return {
+        "success": result["success"],
+        "is_valid": result["is_valid"],
+        "document_id": result["document_id"],
+        "title": result["title"],
+        "source_type": result["source_type"],
+        "source": result["file_path"],
+        "file_name": result["file_name"],
+        "file_type": result["file_type"],
+        "file_size": result["file_size"],
         "cleaned_text_length": result["cleaned_text_length"],
         "document_type": result["document_type"],
         "document_type_confidence": result["document_type_confidence"],

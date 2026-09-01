@@ -17,6 +17,10 @@ class IngestionGraphState(TypedDict):
     title: str
     raw_text: str
     source_url: str | None
+    file_name: str | None
+    file_path: str | None
+    file_type: str | None
+    file_size: int | None
     metadata: dict
     analysis_result: dict
     cleaned_text_length: int
@@ -121,6 +125,14 @@ def run_nlp_analysis(
             max_summary_sentences=5
         )
 
+        document_title = (
+            analysis_result.get("title")
+            or state.get("file_name")
+            or state.get("title")
+            or "Untitled Document"
+        )
+        analysis_result["title"] = document_title
+
         transformer_analysis = (
             analysis_result
             .get("analysis", {})
@@ -129,6 +141,7 @@ def run_nlp_analysis(
         )
 
         state["analysis_result"] = analysis_result
+        state["title"] = document_title
         state["cleaned_text_length"] = analysis_result["text"]["cleaned_text_length"]
         state["document_type"] = transformer_analysis.get("document_type", "unknown")
         state["document_type_confidence"] = transformer_analysis.get("confidence", 0.0)
@@ -153,13 +166,21 @@ def save_document_to_db(
 
         saved_document = document_repository.create_document(
             db=state["db"],
-            title=analysis_result["title"],
+            title=(
+                analysis_result.get("title")
+                or state.get("file_name")
+                or "Untitled Document"
+            ),
             source_type=analysis_result["source_type"],
             source_url=analysis_result["source_url"],
             raw_text=state["raw_text"],
             cleaned_text=analysis_result["text"]["cleaned_text"],
             cleaned_text_preview=analysis_result["text"]["preview"],
-            nlp_metadata=analysis_result["analysis"]
+            nlp_metadata=analysis_result["analysis"],
+            file_name=state.get("file_name"),
+            file_path=state.get("file_path"),
+            file_type=state.get("file_type"),
+            file_size=state.get("file_size")
         )
 
         state["document_id"] = saved_document.document_id
@@ -170,6 +191,7 @@ def save_document_to_db(
         return state
 
     except Exception as error:
+        state["db"].rollback()
         state["saved_to_db"] = False
         state["success"] = False
         state["error"] = str(error)
