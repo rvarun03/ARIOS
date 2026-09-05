@@ -11,6 +11,7 @@ from services.vector_store_services import VectorStoreService
 from services.RAG_service import RAGService
 from services.llm_service import LLM_Service
 from services.s3_service import S3Service
+from services.query_expansion_service import QueryExpansionService
 
 class DocumentService:
 
@@ -25,6 +26,7 @@ class DocumentService:
         self.rag_service = RAGService()
         self.llm_service= LLM_Service()
         self.s3_service = S3Service()
+        self.query_expansion_service = QueryExpansionService()
         
     def ingest_analyze_and_save(
         self,
@@ -462,6 +464,96 @@ class DocumentService:
 
         return documents
 
+    ## hybrid_search
+
+    def hybrid_search(
+        self,
+        db,
+        question:str,
+        top_k: int =5,
+        source_type: str | None = None,
+        document_id: int | None = None
+    )->dict:
+        
+        expanded_queries = self.query_expansion_service.generate_search_queries(
+            question=question,
+            max_queries=4
+        )
+
+        if not expanded_queries:
+            expanded_queries = [question]
+
+        all_results=[]
+
+        search_top_k = max(top_k, 10)
+
+        for expanded_query in expanded_queries:  
+
+            semantic_search_result = self.semantic_search(
+                query= expanded_query,
+                top_k= search_top_k,
+                source_type=source_type,
+                document_id=document_id
+            ) 
+
+            semantic_results = semantic_search_result.get("results", [])
+
+            for rank,result in enumerate(semantic_results, start=1):
+
+                result=dict(result)
+
+                result["retrieval_type"] = "semantic"
+                result["search_query"] = expanded_query
+                result["semantic_rank"] = rank
+                result["hybrid_score"] = self._calculate_rank_fusion_score(
+                    rank=rank,
+                    weight=1.0
+                )
+                all_results.append(result)
+
+            keyword_results = self.chunk_repository.search_chunks_by_keywords(
+                db=db,
+                query=expanded_query,
+                top_k=search_top_k,
+                source_type=source_type,
+                document_id=document_id
+            )
+
+            for rank, result in enumerate(keyword_results, start=1):
+                result = dict(result)
+
+                result["retrieval_type"] = "keyword"
+                result["search_query"] = expanded_query
+                result["keyword_rank"] = rank
+                result["hybrid_score"] = self._calculate_rank_fusion_score(
+                    rank=rank,
+                    weight=0.3
+                )
+
+                all_results.append(result)    
+
+        merged_results = self._merge_hybrid_results(
+            results=all_results,
+            top_k=top_k
+        )    
+
+        final_results = merged_results[:top_k]
+
+        expanded_results = self._expand_with_neighbor_chunks(
+            db=db,
+            results=final_results,
+            window_size=1
+        )
+
+        return {
+            "query": question,
+            "expanded_queries": expanded_queries,
+            "top_k": top_k,
+            "result_count": len(expanded_results),
+            "retrieval_mode": "hybrid_rank_fusion_with_neighbors",
+            "results": expanded_results
+        }
+
     def ask_question(
         self,
         db,
@@ -477,8 +569,38 @@ class DocumentService:
             document_id=document_id
         )
 
-        retrieved_chunks = search_result.get("results", [])
+        # search_result = self.hybrid_search(
+        #     db=db,
+        #     question=question,
+        #     top_k=top_k,
+        #     source_type=source_type,
+        #     document_id=document_id
+        # )
 
+        retrieved_chunks = search_result.get("results", [])
+        retrieval_debug = []
+
+        for index, chunk in enumerate(retrieved_chunks, start=1):
+            metadata = chunk.get("metadata", {})
+
+            retrieval_debug.append(
+                {
+                    "rank": index,
+                    "document_id": metadata.get("document_id"),
+                    "chunk_id": metadata.get("chunk_id"),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "title": metadata.get("title"),
+                    "retrieval_type": chunk.get("retrieval_type"),
+                    "retrieval_types": chunk.get("retrieval_types"),
+                    "hybrid_score": chunk.get("hybrid_score"),
+                    "semantic_fusion_score": chunk.get("semantic_fusion_score"),
+                    "keyword_fusion_score": chunk.get("keyword_fusion_score"),
+                    "distance": chunk.get("distance"),
+                    "keyword_score": chunk.get("keyword_score"),
+                    "matched_search_queries": chunk.get("matched_search_queries"),
+                    "chunk_text_preview": chunk.get("chunk_text", "")[:2000]
+                }
+            )
         if not retrieved_chunks:
             return {
                 "question": question,
@@ -526,6 +648,9 @@ class DocumentService:
         "question": question,
         "answer": clean_answer,
         "metadata_used": bool(metadata_context),
+        "retrieval_debug": retrieval_debug,
+        "retrieval_mode": search_result.get("retrieval_mode"),
+        "expanded_queries": search_result.get("expanded_queries"),
         "evaluation": evaluation
     }
 
@@ -751,3 +876,317 @@ class DocumentService:
             "stored_vector_count": vector_result["stored_count"],
             "indexed_text": "cleaned_text" if document.cleaned_text else "raw_text"
         }
+
+## Helpers
+
+    def _merge_hybrid_results(
+        self,
+        results: list[dict],
+        top_k: int
+    )-> list[dict]:
+
+        merged_results={}
+
+        for result in results:
+
+            metadata = result.get('metadata',{})
+
+            document_id = metadata.get("document_id")
+            chunk_id = metadata.get("chunk_id")
+
+            if document_id is None or chunk_id is None:
+                continue
+
+            result_key= f"{document_id}_{chunk_id}"
+
+            retrieval_type = result.get(
+                "retrieval_type",
+                "unknown"
+            )    
+
+            retrieval_type = result.get(
+                "retrieval_type",
+                "unknown"
+            )
+
+            search_query = result.get("search_query")
+
+            result_score = float(
+                result.get("hybrid_score") or 0
+            )
+
+            if result_key not in merged_results:
+                new_result= dict(result)
+                new_result["retrieval_types"] = []
+                new_result["matched_search_queries"] = []
+
+                new_result["_semantic_fusion_score"] = 0.0
+                new_result["_keyword_fusion_score"] = 0.0
+                new_result["hybrid_score"] = 0.0
+
+                merged_results[result_key] = new_result
+
+            existing_result = merged_results[result_key]
+
+            if retrieval_type not in  existing_result["retrieval_types"]:
+                existing_result["retrieval_types"].append(retrieval_type)
+
+            existing_result["retrieval_type"] = "+".join(
+                existing_result["retrieval_types"]
+            )    
+
+            if search_query and search_query not in existing_result["matched_search_queries"]:
+                existing_result["matched_search_queries"].append(search_query)
+
+            if retrieval_type == "semantic":
+                existing_result["_semantic_fusion_score"] = max(
+                    existing_result["_semantic_fusion_score"],
+                    result_score
+                )      
+
+            if retrieval_type == "keyword":
+                existing_result["_keyword_fusion_score"] = max(
+                    existing_result["_keyword_fusion_score"],
+                    result_score
+                )       
+
+            existing_result["hybrid_score"] = round(
+                existing_result["_semantic_fusion_score"]
+                + existing_result["_keyword_fusion_score"],
+                4
+            )    
+
+            existing_result["hybrid_score"] = round(
+                existing_result["_semantic_fusion_score"]
+                + existing_result["_keyword_fusion_score"],
+                4
+            )  
+
+            existing_keyword_score = existing_result.get("keyword_score") or 0
+            new_keyword_score = result.get("keyword_score") or 0
+
+            existing_result["keyword_score"] = max(
+                existing_keyword_score,
+                new_keyword_score
+            )
+
+            existing_distance = existing_result.get("distance")
+            new_distance = result.get("distance")
+
+            if new_distance is not None:
+                if existing_distance is None:
+                    existing_result["distance"] = new_distance
+                else:
+                    existing_result["distance"] = min(
+                        float(existing_distance),
+                        float(new_distance)
+                    )
+
+        final_results = list(
+            merged_results.values()
+        )            
+        for result in final_results:
+            result["semantic_fusion_score"] = result.pop(
+                "_semantic_fusion_score",
+                0.0
+            )
+            result["keyword_fusion_score"] = result.pop(
+                "_keyword_fusion_score",
+                0.0
+            )
+
+        final_results = sorted(
+            final_results,
+            key=lambda item: item["hybrid_score"],
+            reverse=True
+        )
+
+        return final_results[:top_k]    
+            
+        # merged_results={}
+
+        # for result in results:
+        #     metadata = result.get("metadata", {})
+
+        #     document_id = metadata.get("document_id")
+        #     chunk_id = metadata.get("chunk_id")
+
+        #     if document_id is None or chunk_id is None:
+        #         continue
+
+        #     result_key = f"{document_id}_{chunk_id}"
+
+        #     result_score = float(
+        #         result.get("hybrid_score") or 0
+        #     ) 
+
+        #     retrieval_type = result.get(
+        #         "retrieval_type",
+        #         "unknown"
+        #     )
+
+        #     search_query = result.get("search_query")
+
+        #     if result_key not in merged_results:
+
+        #         new_result = dict(result)
+
+        #         new_result["hybrid_score"] = result_score
+        #         new_result["retrieval_types"] = [retrieval_type]
+        #         new_result["matched_search_queries"] = []
+
+        #         if search_query:
+        #             new_result["matched_search_queries"].append(search_query)
+
+        #         merged_results[result_key] = new_result    
+
+        #     else:
+
+        #         existing_result = merged_results[result_key]
+
+        #         existing_result["hybrid_score"] += result_score
+
+        #         if retrieval_type not in existing_result["retrieval_type"]:
+        #             existing_result["retrieval_types"].append(retrieval_type)
+
+        #         existing_result["retrieval_type"] = "+".join(
+        #             existing_result["retrieval_types"]
+        #         )    
+
+        #         if search_query and search_query not in existing_result["matched_search_queries"]:
+        #             existing_result["matched_search_queries"].append(search_query)
+
+        #         existing_keyword_score = existing_result.get("keyword_score") or 0
+        #         new_keyword_score = result.get("keyword_score") or 0 
+
+        #         existing_result["keyword_score"] = max(
+        #             existing_keyword_score,
+        #             new_keyword_score
+        #         )    
+
+        #         existing_distance = existing_result.get("distance")
+        #         new_distance = result.get("distance")
+
+        #         if new_distance is not None:
+        #             if existing_distance is None:
+        #                 existing_result["distance"] = new_distance
+        #             else:
+        #                 existing_result["distance"] = min(
+        #                     float(existing_distance),
+        #                     float(new_distance)
+        #                 )    
+
+        # final_results = list(
+        #     merged_results.values()
+        # )                
+
+        # final_results = sorted(
+        #     final_results,
+        #     key = lambda item: item["hybrid_score"],
+        #     reverse=True
+        # )
+
+        # return final_results[:top_k]
+                
+                   
+
+    def _calculate_semantic_hybrid_search(
+        self,
+        distance,
+        rank: int
+    )-> float:
+
+        if distance is None:
+            return 0.0
+
+        distance=float(distance)
+
+        semantic_score = 1 / (1 + distance)
+        rank_bonus = 1 / rank
+
+        return round(
+            (semantic_score * 100) + (rank_bonus * 10),
+            4
+        )
+
+    def _calculate_semantic_hybrid_score(
+        self,
+        keyword_score,
+        rank: int
+    ) -> float:
+
+        if keyword_score is None:
+            return 0.0
+
+        keyword_score = float(keyword_score)
+        rank_bonus = 1 / rank
+
+        return round(
+            keyword_score + (rank_bonus * 20),
+            4
+        )
+
+    def _calculate_rank_fusion_score(
+        self,
+        rank: int,
+        weight: float = 1.0
+    ) -> float:
+
+        return round(
+            weight * (1 / rank),
+            4
+        )
+
+    def _expand_with_neighbor_chunks(
+        self,
+        db,
+        results: list[dict],
+        window_size: int = 1
+    ) -> list[dict]:
+
+        expanded_results = []
+
+        for result in results:
+            metadata = result.get("metadata", {})
+
+            document_id = metadata.get("document_id")
+            chunk_index = metadata.get("chunk_index")
+
+            if document_id is None or chunk_index is None:
+                expanded_results.append(result)
+                continue
+
+            neighbor_chunks = self.chunk_repository.get_neighbor_chunks(
+                db=db,
+                document_id=int(document_id),
+                chunk_index=int(chunk_index),
+                window_size=window_size
+            )
+
+            combined_text_parts = []
+            neighbor_debug = []
+
+            for chunk in neighbor_chunks:
+                combined_text_parts.append(
+                    f"[Chunk index {chunk.chunk_index}]\n{chunk.chunk_text}"
+                )
+
+                neighbor_debug.append(
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "chunk_index": chunk.chunk_index
+                    }
+                )
+
+            expanded_result = dict(result)
+
+            expanded_result["original_chunk_text"] = result.get("chunk_text", "")
+            expanded_result["chunk_text"] = "\n\n".join(combined_text_parts)
+            expanded_result["neighbor_expanded"] = True
+            expanded_result["neighbor_window_size"] = window_size
+            expanded_result["neighbor_chunks"] = neighbor_debug
+
+            expanded_results.append(expanded_result)
+
+        return expanded_results
+        

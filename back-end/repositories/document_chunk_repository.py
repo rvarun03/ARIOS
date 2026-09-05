@@ -96,7 +96,7 @@ class DocumentChunkRepository:
 
         if document_id is not None:
             db_query=db_query.filter(
-                Document.document_id == DocumentChunk.document_id
+                DocumentChunk.document_id == document_id
             )
 
         if source_type:
@@ -192,7 +192,6 @@ class DocumentChunkRepository:
             if token.pos_ not in important_pos:
                 continue
 
-            token_text=token.lower()
             token_text = token.text.lower()
             token_lemma = token.lemma_.lower()
 
@@ -219,15 +218,78 @@ class DocumentChunkRepository:
         return unique_items        
 
     def __calculate_keyword_score(
+            self,
+            text: str,
+            keywords: list[str]
+        ) -> int:
+
+
+        if not text or not keywords:
+            return 0
+
+        text_lower=text.lower()
+
+        entity_keywords = []
+        intent_keywords = []
+
+        keyword_doc = self.nlp(" ".join(keywords))
+
+        for token in keyword_doc:
+
+            keyword = token.text.lower()
+
+            if token.pos_ == "PROPN":
+                entity_keywords.append(keyword)
+            else:
+                intent_keywords.append(keyword)
+
+        entity_keywords = self._remove_duplicates(entity_keywords)
+        intent_keywords = self._remove_duplicates(intent_keywords)
+
+        matched_entity_keywords=[
+            keyword
+            for keyword in entity_keywords
+            if keyword in text_lower
+        ]
+
+        matched_intent_keywords = [
+            keyword
+            for keyword in intent_keywords
+            if keyword in text_lower
+        ]
+
+        if intent_keywords and not matched_intent_keywords:
+            return 0
+
+        entity_score = len(matched_entity_keywords) * 20
+        intent_score = len(matched_intent_keywords) * 200
+
+        frequency_score = 0
+
+        for keyword in matched_intent_keywords:
+            frequency_score += text_lower.count(keyword) * 10
+
+        for keyword in matched_entity_keywords:
+            frequency_score += text_lower.count(keyword)
+
+        return entity_score + intent_score + frequency_score
+
+    def get_neighbor_chunks(
         self,
-        text: str,
-        keywords: list[str]
-    ) -> int:
+        db,
+        document_id: int,
+        chunk_index: int,
+        window_size: int = 1
+    ) -> list[DocumentChunk]:
 
-        text_lower = text.lower()
-        score=0
+        start_index = max(0, chunk_index - window_size)
+        end_index = chunk_index + window_size
 
-        for keyword in keywords:
-            score+= text_lower.count(keyword.lower())
-
-        return score    
+        return (
+            db.query(DocumentChunk)
+            .filter(DocumentChunk.document_id == document_id)
+            .filter(DocumentChunk.chunk_index >= start_index)
+            .filter(DocumentChunk.chunk_index <= end_index)
+            .order_by(DocumentChunk.chunk_index.asc())
+            .all()
+        )    
