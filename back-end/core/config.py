@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     ## BASIC DETAILS
     APP_NAME: str = "ARIOS"
     ENV: str = "dev"
+    FRONTEND_URL: str
 
     ## DATABASE 
     DATABASE_URL: str

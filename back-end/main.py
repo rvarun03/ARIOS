@@ -1,7 +1,9 @@
 from fastapi import FastAPI,Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import uvicorn
 from core.database import get_db
+from core.config import settings
 from routes.health import router as health_router
 
 from ingestion.ingestion_router import ingest
@@ -36,6 +38,14 @@ from models.document import Document
 
 
 app=FastAPI(title="ARIOS Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL.rstrip("/")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 Base.metadata.create_all(
     bind=engine
