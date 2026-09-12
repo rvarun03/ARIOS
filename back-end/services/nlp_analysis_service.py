@@ -40,8 +40,8 @@ class NLPAnalysisService:
         cleaned_text=self.processor.clean_text(
             raw_text
         )
-        normalised_text= self.processor.normalize_text(
 
+        normalised_text= self.processor.normalize_text(
             cleaned_text
         )
 

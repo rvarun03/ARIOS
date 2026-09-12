@@ -1,67 +1,102 @@
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse,parse_qs
 from youtube_transcript_api import YouTubeTranscriptApi
 from schemas.ingestion import IngestionOutput
 
+def extract_video_id(url:str)-> str:
 
-def extract_video_id(url:str) -> str:
-    """"
-       Extract the video id from the youtube url 
-    """
-    parsed_url= urlparse(url)
+    parsed_url=urlparse(url)
 
-    if parsed_url.hostname in [
-        "www.youtube.com",
-        "youtube.com"
-    ]:
-        return parse_qs(parsed_url.query)["v"][0]
-    
-    if parsed_url.hostname == "youtu.be":
-        return parsed_url.path[1:]
-    
+    hostname=parsed_url.hostname
+
+    if hostname in ["www.youtube.com", "youtube.com", "m.youtube.com"]:
+        query_params= parse_qs(parsed_url.query)
+
+        video_id = query_params.get("v")
+
+        if video_id:
+            return video_id[0]
+
+    if hostname == "youtu.be":
+        return parsed_url.path.strip("/")
+
     raise ValueError("Invalid YouTube URL")
 
-def fetch_transcript(video_id:str) -> str:
-
-    """"
-        From the video id fetch the transcript
+def fetch_transcript(video_url:str)->str:
     """
-    api = YouTubeTranscriptApi()
+    Fetch transcript text from YouTube using video_id.
+    """
 
-    transcript = api.fetch(video_id)
-    
-    print(type(transcript))
-    print(type(transcript[0]))
-    print(transcript[0])
+    api=YouTubeTranscriptApi()
+    transcript=api.fetch(video_url)
 
-    raw_text = " ".join(
-        item.text
-        for item in transcript
-    )
-    return raw_text
+    segments=[]
 
-def ingest_youtube(url:str) -> IngestionOutput:
-    try:
-        video_id= extract_video_id(url)
-        raw_text= fetch_transcript(video_id)
+    for item in transcript:
+        text=item.text
+        start=float(item.start)
+        duration=float(item.duration)
+        end=start + duration
 
-        return IngestionOutput(
-            source_type="youtube",
-            source_url=url,
-            title=None,
-            raw_text=raw_text,
-            metadata={
-                "video_id": video_id,
-                "length": len(raw_text)
+        segments.append(
+            {
+                "text": text,
+                "start": start,
+                "duration": duration,
+                "end": end
             }
-        )
-    
-    except Exception as e:
+        ) 
+    raw_text = " ".join(
+        segment["text"]
+        for segment in segments
+    )
+
+    return {
+        "raw_text": raw_text,
+        "segments": segments
+    }
+
+
+def ingest_youtube(url:str)->IngestionOutput:
+    """
+    Main YouTube ingestion function.
+    Converts YouTube URL into ARIOS IngestionOutput.
+    """
+
+    try:
+        video_id = extract_video_id(url)
+
+        transcript_result = fetch_transcript(video_id)
+
+        raw_text = transcript_result["raw_text"]
+        segments = transcript_result["segments"]
+
+        if not raw_text:
+            raise ValueError("Transcript was fetched but raw text is empty")
+
+        return IngestionOutput(
+                source_type="youtube",
+                source_url=url,
+                title=f"YouTube Video - {video_id}",
+                raw_text=raw_text,
+                metadata={
+                    "video_id": video_id,
+                    "transcript_available": True,
+                    "segment_count": len(segments),
+                    "raw_text_length": len(raw_text),
+                    "first_segment": segments[0] if segments else None,
+                    "last_segment": segments[-1] if segments else None
+                }
+            )    
+
+    except Exception as error:
         return IngestionOutput(
             source_type="youtube",
             source_url=url,
-            title=None,
+            title="YouTube Video",
             raw_text="",
             metadata={
-                "error": str(e)
+                "transcript_available": False,
+                "error": str(error)
             }
         )
+    
