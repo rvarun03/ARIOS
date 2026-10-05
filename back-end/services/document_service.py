@@ -578,6 +578,11 @@ class DocumentService:
         # )
 
         retrieved_chunks = search_result.get("results", [])
+
+        sources = self._build_sources_from_retrieved_chunks(
+            retrieved_chunks=retrieved_chunks
+        )
+
         retrieval_debug = []
 
         for index, chunk in enumerate(retrieved_chunks, start=1):
@@ -603,11 +608,17 @@ class DocumentService:
             )
         if not retrieved_chunks:
             return {
-                "question": question,
-                "answer": "I could not find this information in the provided documents.",
-                "source_count": 0,
-                "sources": []
+            "question": question,
+            "answer": "I could not find this information in the provided documents.",
+            "source_count": 0,
+            "sources": [],
+            "retrieval_debug": [],
+            "evaluation": {
+                "answer_generated": False,
+                "retrieved_chunk_count": 0,
+                "requested_top_k": top_k
             }
+        }
 
         context = self.rag_service.build_context(
             retrieved_chunks=retrieved_chunks
@@ -645,14 +656,16 @@ class DocumentService:
         )
 
         return {
-        "question": question,
-        "answer": clean_answer,
-        "metadata_used": bool(metadata_context),
-        "retrieval_debug": retrieval_debug,
-        "retrieval_mode": search_result.get("retrieval_mode"),
-        "expanded_queries": search_result.get("expanded_queries"),
-        "evaluation": evaluation
-    }
+            "question": question,
+            "answer": clean_answer,
+            "metadata_used": bool(metadata_context),
+            "source_count": len(sources),
+            "sources": sources,
+            "retrieval_debug": retrieval_debug,
+            "retrieval_mode": search_result.get("retrieval_mode"),
+            "expanded_queries": search_result.get("expanded_queries"),
+            "evaluation": evaluation
+        }
 
 
     def _build_rag_evaluation(
@@ -1189,4 +1202,31 @@ class DocumentService:
             expanded_results.append(expanded_result)
 
         return expanded_results
-        
+
+    def _build_sources_from_retrieved_chunks(
+        self,
+        retrieved_chunks:list[dict]
+    )->list[dict]:
+
+        sources=[]
+
+        for index,chunk in enumerate(retrieved_chunks,start=1):
+            metadata = chunk.get("metadata", {})
+
+            sources.append(
+                {
+                    "rank": index,
+                    "document_id": metadata.get("document_id"),
+                    "chunk_id": metadata.get("chunk_id"),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "title": metadata.get("title"),
+                    "source_type": metadata.get("source_type"),
+                    "source_url": metadata.get("source_url"),
+                    "file_path": metadata.get("file_path"),
+                    "retrieval_type": chunk.get("retrieval_type"),
+                    "distance": chunk.get("distance"),
+                    "chunk_text": chunk.get("chunk_text", "")
+                }
+            )
+
+        return sources

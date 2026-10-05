@@ -1,0 +1,22 @@
+services:
+  arios-backend:
+
+    build: 
+      context: ./back-end
+      dockerfile: Dockerfile
+
+    container_name: arios-backend
+
+    ports:
+      - "8000:8000"
+    
+    env_file:
+      - ./back-end/.env
+
+    volumes:
+      - ./back-end/arios.db:/app/arios.db
+      - ./back-end/chroma_db:/app/chroma_db
+
+    restart: unless-stopped
+
+  

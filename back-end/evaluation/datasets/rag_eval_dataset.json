@@ -1,0 +1,30 @@
+[
+  {
+    "question": "Who are Virat Kohli's parents?",
+    "source_type": "web",
+    "document_id": 2,
+    "relevant_chunk_ids": [84],
+    "expected_answer": "Virat Kohli's mother is Saroj Kohli and his father is Prem Nath Kohli."
+  },
+  {
+    "question": "What are neurons and layers in a neural network?",
+    "source_type": "youtube",
+    "document_id": 8,
+    "relevant_chunk_ids": [294],
+    "expected_answer": "In the video, neurons are described as things that hold numbers between 0 and 1. The first layer represents the input pixels, and the last layer represents the output digits."
+  },
+  {
+    "question": "How does a neural network recognize digits?",
+    "source_type": "youtube",
+    "document_id": 8,
+    "relevant_chunk_ids": [295, 296],
+    "expected_answer": "A neural network recognizes digits by passing activations through layers. Middle layers may detect smaller patterns such as loops, edges, and lines, which help identify digits."
+  },
+  {
+    "question": "What are weights and biases in a neural network?",
+    "source_type": "youtube",
+    "document_id": 8,
+    "relevant_chunk_ids": [297, 298],
+    "expected_answer": "Weights control how strongly inputs affect a neuron, while biases shift when a neuron becomes active. Learning means finding useful values for these weights and biases."
+  }
+]
