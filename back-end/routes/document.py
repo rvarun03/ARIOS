@@ -210,7 +210,8 @@ def ask_documents(
         top_k=request.top_k,
         db=db,
         source_type=request.source_type,
-        document_id=request.document_id
+        document_id=request.document_id,
+        retrieval_mode=request.retrieval_mode
     )
 
 

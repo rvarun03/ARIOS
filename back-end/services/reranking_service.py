@@ -7,7 +7,7 @@ class RerankerService:
             "cross-encoder/ms-marco-MiniLM-L-6-v2"
         )
 
-    def re_rank(
+    def rerank(
         self,
         chunks:list[dict],
         question:str,
@@ -37,14 +37,14 @@ class RerankerService:
 
         for chunk,score in zip(chunks,scores):
             reranked_chunk=dict(chunk)
-            reranked_chunk["reranked_score"] = round(float(score), 4)
+            reranked_chunk["reranker_score"] = round(float(score), 4)
 
             reranked_chunks.append(reranked_chunk)
 
         reranked_chunks = sorted(
             reranked_chunks,
-            key= lambda item: item["reranked_score"],
-            reverse= True
+            key=lambda item: item["reranker_score"],
+            reverse=True
         )
 
         return reranked_chunks[:top_k]

@@ -12,6 +12,7 @@ from services.RAG_service import RAGService
 from services.llm_service import LLM_Service
 from services.s3_service import S3Service
 from services.query_expansion_service import QueryExpansionService
+from services.reranking_service import RerankerService
 
 class DocumentService:
 
@@ -27,7 +28,8 @@ class DocumentService:
         self.llm_service= LLM_Service()
         self.s3_service = S3Service()
         self.query_expansion_service = QueryExpansionService()
-        
+        self.reranker_service = RerankerService()
+
     def ingest_analyze_and_save(
         self,
         db,
@@ -433,6 +435,39 @@ class DocumentService:
             "results": results
         }
 
+    def semantic_reranked_search(
+        self,
+        query: str,
+        top_k: int = 5,
+        source_type: str | None = None,
+        document_id: int | None = None,
+        candidate_top_k: int = 20
+    ) -> dict:    
+
+        semantic_result = self.semantic_search(
+            query=query,
+            top_k=candidate_top_k,
+            source_type=source_type,
+            document_id=document_id
+        )
+
+        candidate_chunks = semantic_result.get("results", [])
+
+        reranked_chunks = self.reranker_service.rerank(
+            question=query,
+            chunks=candidate_chunks,
+            top_k=top_k
+        )
+
+        return {
+            "query": query,
+            "retrieval_mode": "semantic_reranked",
+            "candidate_top_k": candidate_top_k,
+            "top_k": top_k,
+            "result_count": len(reranked_chunks),
+            "results": reranked_chunks
+        }
+
     def _get_documents_from_retrieved_chunks(
         self,
         db,
@@ -560,15 +595,27 @@ class DocumentService:
         question:str,
         top_k: int = 5,
         source_type: str | None = None,
-        document_id: int | None = None
+        document_id: int | None = None,
+        retrieval_mode: str = "semantic"
     ):
-        search_result = self.semantic_search(
-            query=question,
-            top_k=top_k,
-            source_type=source_type,
-            document_id=document_id
-        )
+        
+        if retrieval_mode == "semantic_reranked":
+            search_result = self.semantic_reranked_search(
+                query=question,
+                top_k=top_k,
+                source_type=source_type,
+                document_id=document_id,
+                candidate_top_k=20
+            )
 
+        else:
+            search_result = self.semantic_search(
+                query=question,
+                top_k=top_k,
+                source_type=source_type,
+                document_id=document_id
+            )
+            search_result["retrieval_mode"] = "semantic"
         # search_result = self.hybrid_search(
         #     db=db,
         #     question=question,
@@ -601,6 +648,7 @@ class DocumentService:
                     "semantic_fusion_score": chunk.get("semantic_fusion_score"),
                     "keyword_fusion_score": chunk.get("keyword_fusion_score"),
                     "distance": chunk.get("distance"),
+                    "reranker_score": chunk.get("reranker_score"),
                     "keyword_score": chunk.get("keyword_score"),
                     "matched_search_queries": chunk.get("matched_search_queries"),
                     "chunk_text_preview": chunk.get("chunk_text", "")[:2000]
@@ -1225,6 +1273,7 @@ class DocumentService:
                     "file_path": metadata.get("file_path"),
                     "retrieval_type": chunk.get("retrieval_type"),
                     "distance": chunk.get("distance"),
+                    "reranker_score": chunk.get("reranker_score"),
                     "chunk_text": chunk.get("chunk_text", "")
                 }
             )
